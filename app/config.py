@@ -11,6 +11,7 @@ class AppConfig(BaseModel):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     # Google Drive Defaults
+    DEFAULT_DRIVE_FOLDER_URL: str = os.getenv("DEFAULT_DRIVE_FOLDER_URL", "https://drive.google.com/drive/folders/1JeQk11TthFV5QgfkBtnrbrQHbZn1x5YT?usp=sharing")
     GOOGLE_API_KEY: str = os.getenv("GOOGLE_API_KEY", "")
     GOOGLE_SERVICE_ACCOUNT_JSON: str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "")
     

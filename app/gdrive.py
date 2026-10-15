@@ -70,12 +70,72 @@ def get_access_token(sa_info: dict) -> Optional[str]:
         print(f"[GDRIVE] Failed to obtain access token from service account: {e}")
         return None
 
+async def scrape_public_drive_folder(folder_id: str) -> List[Dict[str, Any]]:
+    """
+    Extracts video files directly from a public Google Drive folder page
+    without needing an API key or service account.
+    """
+    url = f"https://drive.google.com/drive/folders/{folder_id}?usp=sharing"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    video_files = []
+    seen_ids = set()
+
+    async with httpx.AsyncClient(timeout=25.0, follow_redirects=True) as client:
+        try:
+            resp = await client.get(url, headers=headers)
+            if resp.status_code != 200:
+                return []
+
+            html = resp.text
+            cleaned_html = html.replace(r'\x22', '"').replace(r'\x5b', '[').replace(r'\x5d', ']').replace(r'\/', '/')
+
+            # Match: ["FILE_ID", ["FOLDER_ID"], "FILE_NAME", "MIME_TYPE", ..., SIZE]
+            pattern = rf'\["([a-zA-Z0-9_-]{{25,40}})",\["{re.escape(folder_id)}"\]\s*,\s*"([^"]+\.(?:mkv|mp4|webm|avi|mov|m4v))"\s*,\s*"(video/[^"]+)"(?:,[^,]*){{8,12}},(\d{{7,13}})'
+            matches = re.findall(pattern, cleaned_html, re.IGNORECASE)
+
+            for file_id, name, mime, size_str in matches:
+                if file_id not in seen_ids:
+                    seen_ids.add(file_id)
+                    video_files.append({
+                        "id": file_id,
+                        "name": name,
+                        "mimeType": mime,
+                        "size": int(size_str)
+                    })
+
+            # Fallback pattern without size
+            if not video_files:
+                simple_pattern = rf'\["([a-zA-Z0-9_-]{{25,40}})",\["{re.escape(folder_id)}"\]\s*,\s*"([^"]+\.(?:mkv|mp4|webm|avi|mov|m4v))"'
+                simple_matches = re.findall(simple_pattern, cleaned_html, re.IGNORECASE)
+                for file_id, name in simple_matches:
+                    if file_id not in seen_ids:
+                        seen_ids.add(file_id)
+                        video_files.append({
+                            "id": file_id,
+                            "name": name,
+                            "mimeType": "video/mp4",
+                            "size": 0
+                        })
+        except Exception as e:
+            print(f"[GDRIVE] Error scraping public folder {folder_id}: {e}")
+
+    return video_files
+
 async def list_files_in_drive_folder(folder_id: str, db: Optional[Session] = None) -> List[Dict[str, Any]]:
     """
     Lists all video files in a Google Drive folder.
-    Supports Service Account, API Key, or public folder listing.
+    Supports Service Account, API Key, or public folder listing fallback.
     """
     api_key, sa_info = get_google_credentials_info(db)
+    
+    # If no API credentials configured, use direct public folder scraper
+    if not sa_info and not api_key:
+        print(f"[GDRIVE] No credentials configured. Using public folder scraper for {folder_id}...")
+        return await scrape_public_drive_folder(folder_id)
+
     headers = {}
     params = {
         "q": f"'{folder_id}' in parents and trashed = false",
@@ -117,34 +177,49 @@ async def list_files_in_drive_folder(folder_id: str, db: Optional[Session] = Non
                     if not page_token:
                         break
                 else:
-                    error_msg = resp.text
-                    print(f"[GDRIVE] Error listing folder {folder_id}: Status {resp.status_code} - {error_msg}")
-                    break
+                    print(f"[GDRIVE] API listing returned status {resp.status_code}. Falling back to public scraper...")
+                    return await scrape_public_drive_folder(folder_id)
             except Exception as e:
-                print(f"[GDRIVE] Exception listing folder {folder_id}: {e}")
-                break
+                print(f"[GDRIVE] API Exception: {e}. Falling back to public scraper...")
+                return await scrape_public_drive_folder(folder_id)
 
     return video_files
 
 async def fetch_folder_metadata(folder_id: str, db: Optional[Session] = None) -> Dict[str, Any]:
     """Fetch folder name and details."""
     api_key, sa_info = get_google_credentials_info(db)
-    headers = {}
-    params = {
-        "fields": "id, name"
-    }
-    if sa_info:
-        token = get_access_token(sa_info)
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-    elif api_key:
-        params["key"] = api_key
+    if sa_info or api_key:
+        headers = {}
+        params = {"fields": "id, name"}
+        if sa_info:
+            token = get_access_token(sa_info)
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+        elif api_key:
+            params["key"] = api_key
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            resp = await client.get(f"{DRIVE_V3_FILES_URL}/{folder_id}", params=params, headers=headers)
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            try:
+                resp = await client.get(f"{DRIVE_V3_FILES_URL}/{folder_id}", params=params, headers=headers)
+                if resp.status_code == 200:
+                    return resp.json()
+            except Exception as e:
+                print(f"[GDRIVE] Error fetching folder metadata {folder_id}: {e}")
+
+    # Fallback to scraping title from public webpage
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(
+                f"https://drive.google.com/drive/folders/{folder_id}?usp=sharing",
+                headers={"User-Agent": "Mozilla/5.0"}
+            )
             if resp.status_code == 200:
-                return resp.json()
-        except Exception as e:
-            print(f"[GDRIVE] Error fetching folder metadata {folder_id}: {e}")
-    return {"id": folder_id, "name": f"Folder {folder_id[:8]}..."}
+                match = re.search(r'<title>(.*?)(?:\s*-\s*Google Drive)?</title>', resp.text, re.IGNORECASE)
+                if match:
+                    folder_name = match.group(1).replace("- Google Drive", "").strip()
+                    if folder_name and "google drive" not in folder_name.lower():
+                        return {"id": folder_id, "name": folder_name}
+    except Exception:
+        pass
+
+    return {"id": folder_id, "name": f"Drive Folder ({folder_id[:8]}...)"}
