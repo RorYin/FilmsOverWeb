@@ -88,11 +88,6 @@ async def home_library(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    # Featured Hero Movie (highest rated with backdrop, or newest)
-    hero_movie = db.query(Movie).filter(Movie.backdrop_path != None).order_by(desc(Movie.rating)).first()
-    if not hero_movie:
-        hero_movie = db.query(Movie).order_by(desc(Movie.created_at)).first()
-
     # Continue Watching
     continue_watching_records = db.query(WatchProgress).filter(
         WatchProgress.user_id == user.id,
@@ -111,7 +106,14 @@ async def home_library(
             })
 
     # Recently Added (deduplicated by title/TMDB)
-    recently_added = deduplicate_movies(db.query(Movie).order_by(desc(Movie.created_at)).all())[:15]
+    all_recent = deduplicate_movies(db.query(Movie).order_by(desc(Movie.created_at)).all())
+    recently_added = all_recent[:15]
+
+    # Top 10 recently added movies for rotating Hero Billboard (prefer movies with backdrop/poster)
+    hero_movies = [m for m in all_recent if (m.backdrop_path or m.poster_path)][:10]
+    if not hero_movies and all_recent:
+        hero_movies = all_recent[:10]
+    hero_movie = hero_movies[0] if hero_movies else None
 
     return templates.TemplateResponse(
         request=request,
@@ -119,6 +121,7 @@ async def home_library(
         context={
             "user": user,
             "hero_movie": hero_movie,
+            "hero_movies": hero_movies,
             "continue_watching": continue_watching,
             "recently_added": recently_added
         }

@@ -19,59 +19,86 @@
     </div>
     {% endif %}
 
-    {% if hero_movie %}
-    <!-- Hero Billboard Section (Netflix / Prime Video Style) -->
-    <div class="relative w-full h-[65vh] min-h-[480px] max-h-[720px] overflow-hidden">
-        <!-- Backdrop Image -->
-        <img src="{{ hero_movie.backdrop_path or hero_movie.poster_path }}" alt="{{ hero_movie.title }}" class="w-full h-full object-cover object-center filter brightness-90">
-        <!-- Dark Vignette & Gradient Overlays -->
-        <div class="absolute inset-0 hero-gradient"></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-transparent to-black/40"></div>
+    {% if hero_movies and hero_movies|length > 0 %}
+    <!-- Hero Billboard Section (Netflix / Prime Video Style rotating among top 10 recently added) -->
+    <div id="hero-carousel" class="relative w-full h-[65vh] min-h-[480px] max-h-[720px] overflow-hidden group">
+        {% for movie in hero_movies %}
+        <div class="hero-slide absolute inset-0 transition-opacity duration-1000 ease-in-out {% if loop.first %}opacity-100 pointer-events-auto z-10{% else %}opacity-0 pointer-events-none z-0{% endif %}" data-slide-index="{{ loop.index0 }}">
+            <!-- Backdrop Image -->
+            <img src="{{ movie.backdrop_path or movie.poster_path }}" alt="{{ movie.title }}" class="w-full h-full object-cover object-center filter brightness-90">
+            <!-- Dark Vignette & Gradient Overlays -->
+            <div class="absolute inset-0 hero-gradient"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-transparent to-black/40"></div>
 
-        <!-- Hero Content Text Overlay -->
-        <div class="absolute bottom-12 left-0 right-0 w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 z-10">
-            <div class="max-w-2xl space-y-4">
-                <!-- Badges -->
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded text-xs font-bold flex items-center space-x-1">
-                        <i data-lucide="star" class="w-3.5 h-3.5 fill-current"></i>
-                        <span>{{ hero_movie.rating }}</span>
-                    </span>
-                    <span class="bg-slate-800/80 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-xs font-medium">{{ hero_movie.year or 'Movie' }}</span>
-                    <span class="bg-slate-800/80 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-xs font-medium">{{ hero_movie.resolution }}</span>
-                    
-                    {% if hero_movie.codec == 'HEVC' %}
-                    <span class="bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded text-xs font-bold">HEVC / H.265</span>
-                    {% elif hero_movie.codec == 'AV1' %}
-                    <span class="bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded text-xs font-bold">AV1</span>
-                    {% else %}
-                    <span class="bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded text-xs font-medium">{{ hero_movie.codec }}</span>
+            <!-- Hero Content Text Overlay -->
+            <div class="absolute bottom-14 left-0 right-0 w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 z-10">
+                <div class="max-w-2xl space-y-4">
+                    <!-- Badges -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        {% if movie.rating %}
+                        <span class="bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded text-xs font-bold flex items-center space-x-1">
+                            <i data-lucide="star" class="w-3.5 h-3.5 fill-current"></i>
+                            <span>{{ movie.rating }}</span>
+                        </span>
+                        {% endif %}
+                        <span class="bg-slate-800/80 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-xs font-medium">{{ movie.year or 'Movie' }}</span>
+                        {% if movie.resolution %}
+                        <span class="bg-slate-800/80 border border-slate-700 text-slate-300 px-2 py-0.5 rounded text-xs font-medium">{{ movie.resolution }}</span>
+                        {% endif %}
+                        
+                        {% if movie.codec == 'HEVC' %}
+                        <span class="bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded text-xs font-bold">HEVC / H.265</span>
+                        {% elif movie.codec == 'AV1' %}
+                        <span class="bg-purple-500/20 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded text-xs font-bold">AV1</span>
+                        {% elif movie.codec %}
+                        <span class="bg-blue-500/20 text-blue-300 border border-blue-500/40 px-2 py-0.5 rounded text-xs font-medium">{{ movie.codec }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Title -->
+                    <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-md">
+                        {{ movie.title }}
+                    </h1>
+
+                    <!-- Overview -->
+                    {% if movie.overview %}
+                    <p class="text-slate-300 text-sm sm:text-base line-clamp-3 leading-relaxed drop-shadow max-w-xl">
+                        {{ movie.overview }}
+                    </p>
                     {% endif %}
-                </div>
 
-                <!-- Title -->
-                <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight drop-shadow-md">
-                    {{ hero_movie.title }}
-                </h1>
-
-                <!-- Overview -->
-                <p class="text-slate-300 text-sm sm:text-base line-clamp-3 leading-relaxed drop-shadow max-w-xl">
-                    {{ hero_movie.overview }}
-                </p>
-
-                <!-- Action Buttons -->
-                <div class="flex items-center space-x-4 pt-2">
-                    <a href="/watch/{{ hero_movie.id }}" class="bg-brand-red hover:bg-brand-redHover text-black px-6 py-3 rounded-xl font-black text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
-                        <i data-lucide="play" class="w-5 h-5 fill-current"></i>
-                        <span>Watch Now</span>
-                    </a>
-                    <a href="/movie/{{ hero_movie.id }}" class="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 px-5 py-3 rounded-xl font-semibold text-sm flex items-center space-x-2 backdrop-blur transition">
-                        <i data-lucide="info" class="w-5 h-5"></i>
-                        <span>More Details</span>
-                    </a>
+                    <!-- Action Buttons -->
+                    <div class="flex items-center space-x-4 pt-2">
+                        <a href="/watch/{{ movie.id }}" class="bg-brand-red hover:bg-brand-redHover text-black px-6 py-3 rounded-xl font-black text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
+                            <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                            <span>Watch Now</span>
+                        </a>
+                        <a href="/movie/{{ movie.id }}" class="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 px-5 py-3 rounded-xl font-semibold text-sm flex items-center space-x-2 backdrop-blur transition">
+                            <i data-lucide="info" class="w-5 h-5"></i>
+                            <span>More Details</span>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
+        {% endfor %}
+
+        {% if hero_movies|length > 1 %}
+        <!-- Prev & Next Arrow Controls (Visible on hover) -->
+        <button id="hero-prev-btn" type="button" class="absolute left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/50 hover:bg-black/80 border border-white/20 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 backdrop-blur cursor-pointer" aria-label="Previous Featured Movie">
+            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+        </button>
+        <button id="hero-next-btn" type="button" class="absolute right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-black/50 hover:bg-black/80 border border-white/20 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 backdrop-blur cursor-pointer" aria-label="Next Featured Movie">
+            <i data-lucide="chevron-right" class="w-6 h-6"></i>
+        </button>
+
+        <!-- Slide Indicators / Dots -->
+        <div class="absolute bottom-5 right-8 z-20 flex items-center space-x-2">
+            {% for movie in hero_movies %}
+            <button type="button" class="hero-dot h-1.5 rounded-full transition-all duration-300 cursor-pointer {% if loop.first %}w-7 bg-brand-red{% else %}w-2 bg-white/40 hover:bg-white/70{% endif %}" data-dot-index="{{ loop.index0 }}" aria-label="Go to slide {{ loop.index }}"></button>
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
     {% else %}
     <!-- Empty State Banner -->
@@ -95,7 +122,7 @@
     {% endif %}
 
     <!-- Carousel Rails (Expanded to 90% full page width) -->
-    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12 {% if hero_movie %}-mt-10 z-20 relative{% endif %}">
+    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12 {% if hero_movies %}-mt-10 z-20 relative{% endif %}">
 
         <!-- Continue Watching (if present) -->
         {% if continue_watching %}
@@ -141,13 +168,13 @@
         </div>
         {% endif %}
 
-        <!-- Recently Added from Google Drive -->
+        <!-- Recently Added -->
         {% if recently_added %}
         <div>
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center space-x-2">
                     <i data-lucide="sparkles" class="w-5 h-5 text-brand-blue"></i>
-                    <span>Recently Added from Google Drive</span>
+                    <span>Recently Added</span>
                 </h2>
                 <a href="/movies?sort=newest" class="text-xs text-brand-blue hover:underline font-semibold flex items-center space-x-1">
                     <span>Explore All</span>
@@ -164,4 +191,93 @@
 
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const slides = document.querySelectorAll('.hero-slide');
+        const dots = document.querySelectorAll('.hero-dot');
+        const prevBtn = document.getElementById('hero-prev-btn');
+        const nextBtn = document.getElementById('hero-next-btn');
+        const carousel = document.getElementById('hero-carousel');
+
+        if (!slides.length || slides.length <= 1) return;
+
+        let currentIndex = 0;
+        let slideInterval = null;
+
+        function showSlide(index) {
+            if (index < 0) index = slides.length - 1;
+            if (index >= slides.length) index = 0;
+            currentIndex = index;
+
+            slides.forEach((slide, i) => {
+                if (i === currentIndex) {
+                    slide.classList.remove('opacity-0', 'pointer-events-none', 'z-0');
+                    slide.classList.add('opacity-100', 'pointer-events-auto', 'z-10');
+                } else {
+                    slide.classList.remove('opacity-100', 'pointer-events-auto', 'z-10');
+                    slide.classList.add('opacity-0', 'pointer-events-none', 'z-0');
+                }
+            });
+
+            dots.forEach((dot, i) => {
+                if (i === currentIndex) {
+                    dot.className = 'hero-dot h-1.5 rounded-full transition-all duration-300 cursor-pointer w-7 bg-brand-red';
+                } else {
+                    dot.className = 'hero-dot h-1.5 rounded-full transition-all duration-300 cursor-pointer w-2 bg-white/40 hover:bg-white/70';
+                }
+            });
+        }
+
+        function startAutoCycle() {
+            stopAutoCycle();
+            slideInterval = setInterval(() => {
+                showSlide(currentIndex + 1);
+            }, 6000);
+        }
+
+        function stopAutoCycle() {
+            if (slideInterval) {
+                clearInterval(slideInterval);
+                slideInterval = null;
+            }
+        }
+
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                showSlide(currentIndex + 1);
+                startAutoCycle();
+            });
+        }
+
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                showSlide(currentIndex - 1);
+                startAutoCycle();
+            });
+        }
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const idx = parseInt(dot.getAttribute('data-dot-index'));
+                if (!isNaN(idx)) {
+                    showSlide(idx);
+                    startAutoCycle();
+                }
+            });
+        });
+
+        if (carousel) {
+            carousel.addEventListener('mouseenter', stopAutoCycle);
+            carousel.addEventListener('mouseleave', startAutoCycle);
+        }
+
+        startAutoCycle();
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    });
+</script>
 {% endblock %}
