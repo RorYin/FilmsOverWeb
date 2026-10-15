@@ -1,0 +1,221 @@
+{
+  "users": [
+    {
+      "id": 2,
+      "email": "drmnbot@gmail.com",
+      "name": "Super Administrator",
+      "hashed_password": "$2b$12$ZaEvnGNRSF2NIFNX2/bGm.jermXVh2kp8hAEh8sohupv2me9KtvQ.",
+      "role": "superadmin",
+      "is_active": 1,
+      "must_change_password": 0,
+      "created_at": "2026-10-15T17:43:44.911946"
+    },
+    {
+      "id": 3,
+      "email": "testguest@example.com",
+      "name": "Guest Tester",
+      "hashed_password": "$2b$12$3CI7mRUzTTunDrt58L9kVeqNye6QbvBiVnXkwdd6vC.GCcwX8.OtW",
+      "role": "guest",
+      "is_active": 1,
+      "must_change_password": 0,
+      "created_at": "2026-10-15T20:02:34.376541"
+    }
+  ],
+  "drive_folders": [
+    {
+      "id": 2,
+      "folder_id": "1JeQk11TthFV5QgfkBtnrbrQHbZn1x5YT",
+      "folder_name": "Drive Folder (1JeQk11T...)",
+      "folder_url": "https://drive.google.com/drive/folders/1JeQk11TthFV5QgfkBtnrbrQHbZn1x5YT?usp=sharing",
+      "movie_count": 3,
+      "last_synced_at": "2026-10-15T19:45:15.896651",
+      "created_by_id": null,
+      "created_at": "2026-10-15T17:49:01.712740"
+    }
+  ],
+  "movies": [
+    {
+      "id": 5,
+      "gdrive_file_id": "1CdUqK06DYnJupR4pPAGnDJb2j7xzE_mX",
+      "folder_id": 2,
+      "file_name": "7G.Rainbow.Colony.2004.Tamil.2160p.AMZN.WEB-DL.DD+5.1.H.265-JeRi.mkv",
+      "file_size": 28743164053,
+      "mime_type": "video/matroska",
+      "codec": "HEVC",
+      "resolution": "4K UHD",
+      "tmdb_id": 24448,
+      "title": "7G Rainbow Colony",
+      "original_title": "7\u0b9c\u0bbf \u0bb0\u0bc6\u0baf\u0bbf\u0ba9\u0bcd\u0baa\u0bcb \u0b95\u0bbe\u0bb2\u0ba9\u0bbf",
+      "year": 2004,
+      "overview": "Kathir is a young underachiever who frequently vents his frustrations through public outbursts. When Anitha, a North Indian girl whose family has fallen on hard times, moves into his housing colony, he soon decides to pursue her with his love, but she keeps rejecting his advances.",
+      "tagline": "",
+      "poster_path": "https://image.tmdb.org/t/p/w500/87qT4iZ3ksBBsiKdqHUJEtZcnum.jpg",
+      "backdrop_path": "https://image.tmdb.org/t/p/original/1NyYTmUQ1ZKBlbLAvOjVy9Mb2sE.jpg",
+      "rating": 6.8,
+      "vote_count": 30,
+      "duration": 185,
+      "genres": "Drama, Comedy, Romance",
+      "cast": "Ravi Krishna, Sonia Agarwal, Suman Shetty, Vijayan, Chandra Mohan",
+      "director": "Selvaraghavan",
+      "trailer_url": "https://www.youtube.com/watch?v=on5MeDsSWks",
+      "original_language": "Tamil",
+      "created_at": "2026-10-15T17:49:02.631497",
+      "updated_at": "2026-10-15T19:57:53.333203"
+    },
+    {
+      "id": 6,
+      "gdrive_file_id": "1ve1pOKa0v15PekVfFSLynVofSZ2SrS3r",
+      "folder_id": 2,
+      "file_name": "Schindlers.List.1993.2160p.MA.WEB-DL.DDP5.1.Atmos.H.265-Friday4KPopcorn.mkv",
+      "file_size": 37305470900,
+      "mime_type": "video/x-matroska",
+      "codec": "HEVC",
+      "resolution": "4K UHD",
+      "tmdb_id": 424,
+      "title": "Schindler's List",
+      "original_title": "Schindler's List",
+      "year": 1993,
+      "overview": "The true story of how businessman Oskar Schindler saved over a thousand Jewish lives from the Nazis while they worked as slaves in his factory during World War II.",
+      "tagline": "Whoever saves one life, saves the world entire.",
+      "poster_path": "https://image.tmdb.org/t/p/w500/sF1U4EUQS8YHUYjNl3pMGNIQyr0.jpg",
+      "backdrop_path": "https://image.tmdb.org/t/p/original/zb6fM1CX41D9rF9hdgclu0peUmy.jpg",
+      "rating": 8.6,
+      "vote_count": 18037,
+      "duration": 195,
+      "genres": "Drama, History, War",
+      "cast": "Liam Neeson, Ben Kingsley, Ralph Fiennes, Caroline Goodall, Jonathan Sagall",
+      "director": "Steven Spielberg",
+      "trailer_url": "https://www.youtube.com/watch?v=v0RB-3sWbBA",
+      "original_language": "English",
+      "created_at": "2026-10-15T17:49:02.631499",
+      "updated_at": "2026-10-15T19:57:53.333206"
+    },
+    {
+      "id": 7,
+      "gdrive_file_id": "10h-CMyKXxqeMXHCt2iIg4n4_dmKCwXuI",
+      "folder_id": 2,
+      "file_name": "Elumale.2025.2160p.ZEE5.WEB-DL.DD+5.1.H.265-Telly.mp4",
+      "file_size": 1452918688,
+      "mime_type": "video/mp4",
+      "codec": "HEVC",
+      "resolution": "4K UHD",
+      "tmdb_id": 1531329,
+      "title": "Elumale",
+      "original_title": "\u0c8f\u0cb3\u0cc1\u0cae\u0cb2\u0cc6",
+      "year": 2025,
+      "overview": "Set in 2004, a girl and a driver near the Tamil Nadu-Karnataka border become unwitting participants in a night filled with crime and conspiracy while trying to find each other.",
+      "tagline": "",
+      "poster_path": "https://image.tmdb.org/t/p/w500/svTVD1wWuB2B8CDNvRlTv81Sq0S.jpg",
+      "backdrop_path": "https://image.tmdb.org/t/p/original/vIltX2cwdt3FxhuauuyVB5mSupn.jpg",
+      "rating": 7.0,
+      "vote_count": 1,
+      "duration": 133,
+      "genres": "Romance, Thriller, Drama",
+      "cast": "Raanna, Priyanka Achar, Jagapati Babu, Sardar sathya, Jagappa",
+      "director": "Punit Rangaswamy",
+      "trailer_url": null,
+      "original_language": "Kannada",
+      "created_at": "2026-10-15T18:14:56.856985",
+      "updated_at": "2026-10-15T19:57:53.333206"
+    },
+    {
+      "id": 8,
+      "gdrive_file_id": "10fSh_pp3tSwNZOvX90xeDxdIDa5CSOEe",
+      "folder_id": 2,
+      "file_name": "UGRAMM.(2014.Kannada.DVD.1080p.Ai.Upscaled.[10bit HQ HEVC]~NOTaPIRATE.mkv",
+      "file_size": 6604604568,
+      "mime_type": "video/matroska",
+      "codec": "HEVC",
+      "resolution": "1080p",
+      "tmdb_id": 385152,
+      "title": "Ugramm",
+      "original_title": "Ugramm",
+      "year": 2014,
+      "overview": "Shivarudra Lingaiah, an MLA candidate, who along with Dheeraj, is awaiting to extract vengeance upon Prabhakar by killing his Daughter Nithya. She arrives at Bangalore to Talagavara to visit her late mother's grave and is kidnapped by Dheeraj's gang on the way. Agastya is an automobile mechanic, who saves her from Dheeraj's gang. He takes her to his house for safeguarding as advised by Prabhakar's family-friend, Vishwa.",
+      "tagline": "",
+      "poster_path": "https://image.tmdb.org/t/p/w500/6AdrI68ggKpSBRE2EbnvajeD53q.jpg",
+      "backdrop_path": "https://image.tmdb.org/t/p/original/2RHKfO5oDU9PXOj2amTeAuu1vdE.jpg",
+      "rating": 6.5,
+      "vote_count": 17,
+      "duration": 133,
+      "genres": "Action, Drama, Thriller",
+      "cast": "Sriimurali, Hariprriya, Tilak Shekar, Padmaja Rao, Atul Kulkarni",
+      "director": "Prashanth Neel",
+      "trailer_url": "https://www.youtube.com/watch?v=f7XQSsZLjmo",
+      "original_language": "Kannada",
+      "created_at": "2026-10-15T19:45:15.899147",
+      "updated_at": "2026-10-15T19:57:53.333207"
+    }
+  ],
+  "system_settings": [
+    {
+      "key": "tmdb_api_key",
+      "value": "0f824fb60016b950b99b12305b906d86",
+      "updated_at": "2026-10-15T17:55:02.607278"
+    },
+    {
+      "key": "google_api_key",
+      "value": "",
+      "updated_at": "2026-10-15T17:55:02.665024"
+    },
+    {
+      "key": "google_service_account_json",
+      "value": "",
+      "updated_at": "2026-10-15T17:55:02.667938"
+    },
+    {
+      "key": "smtp_host",
+      "value": "smtp.gmail.com",
+      "updated_at": "2026-10-15T17:55:02.669971"
+    },
+    {
+      "key": "smtp_port",
+      "value": "465",
+      "updated_at": "2026-10-15T17:55:02.671969"
+    },
+    {
+      "key": "smtp_user",
+      "value": "drmnbot@gmail.com",
+      "updated_at": "2026-10-15T17:55:02.728779"
+    },
+    {
+      "key": "smtp_password",
+      "value": "zbubtuedgiocoenh",
+      "updated_at": "2026-10-15T19:34:12.613245"
+    },
+    {
+      "key": "smtp_use_ssl",
+      "value": "true",
+      "updated_at": "2026-10-15T17:55:02.733558"
+    }
+  ],
+  "watch_progress": [
+    {
+      "id": 1,
+      "user_id": 2,
+      "movie_id": 7,
+      "position_seconds": 3068.161545,
+      "duration_seconds": 7980.0,
+      "completed": 0,
+      "updated_at": "2026-10-15T20:03:50.045243"
+    },
+    {
+      "id": 2,
+      "user_id": 2,
+      "movie_id": 5,
+      "position_seconds": 125.5,
+      "duration_seconds": 11100.0,
+      "completed": false,
+      "updated_at": "2026-10-15T19:01:58.834407"
+    },
+    {
+      "id": 3,
+      "user_id": 2,
+      "movie_id": 8,
+      "position_seconds": 2888.844506,
+      "duration_seconds": 7980.0,
+      "completed": 0,
+      "updated_at": "2026-10-15T20:04:31.965256"
+    }
+  ]
+}

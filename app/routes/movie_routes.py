@@ -1,10 +1,8 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
 from typing import Optional
-from app.database import get_db
+from app.database import get_db, desc, Session
 from app.models import Movie, WatchProgress, User
 from app.auth import get_current_user
 

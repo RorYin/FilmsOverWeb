@@ -47,8 +47,8 @@ It features **lossless direct video playback** with native in-browser **HEVC (H.
 FilmsOverWeb/
 ├── app/
 │   ├── config.py                 # App settings & environment resolution
-│   ├── database.py               # SQLite connection & session management
-│   ├── models.py                 # SQLAlchemy models (User, Movie, DriveFolder, etc.)
+│   ├── database.py               # Pure-Python thread-safe JSON database engine
+│   ├── models.py                 # Data models (User, Movie, DriveFolder, etc.)
 │   ├── auth.py                   # JWT cookies, bcrypt hashing, and RBAC guards
 │   ├── parser.py                 # Filename parser for titles, years, codecs & resolution
 │   ├── gdrive.py                 # Google Drive API & Range-based stream generator
@@ -62,7 +62,10 @@ FilmsOverWeb/
 │   │   └── superadmin_routes.py  # System settings (TMDB, GDrive, Gmail) & Admin management
 │   ├── static/                   # CSS, SVG artwork, and icons
 │   └── templates/                # Jinja2 templates (Netflix/Prime design)
-├── seed_demo.py                  # Seed script with demo HEVC/AV1 movies
+├── films_over_web.json           # Native JSON database (Users, Movies, Watch Progress)
+├── Dockerfile                    # Production container with Python 3.11 & FFmpeg
+├── docker-compose.yml            # 1-click Docker deployment
+├── wsgi.py                       # WSGI adapter for PythonAnywhere
 ├── run.py                        # Application entry runner
 └── requirements.txt
 ```

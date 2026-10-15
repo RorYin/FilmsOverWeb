@@ -9,14 +9,16 @@ This guide breaks down where and how to host **FilmsOverWeb**, comparing **Pytho
 | Feature / Requirement | Vercel (Hobby Free) | PythonAnywhere (Free Tier) | Render.com (Free Tier) | Docker / VPS ($4/mo or Free Oracle) |
 |---|:---:|:---:|:---:|:---:|
 | **Can it run FilmsOverWeb?** | ❌ **No (Impossible)** | ⚠️ **Severe Limitations** | ✅ **Yes (Recommended Free)** | 🏆 **Best Performance** |
+| **Database Architecture** | ❌ Wiped on cold-start | ⚠️ 1-worker JSON/WSGI | ✅ **100% Native JSON (`films_over_web.json`)** | ✅ **100% Native JSON (`films_over_web.json`)** |
 | **Execution Timeout** | **10–15 Seconds** (Hard limit) | 300 Seconds per request | Unlimited (Long streaming) | Unlimited |
 | **Response Payload Size** | Max **4.5 MB** | Unlimited | Unlimited | Unlimited |
 | **FFmpeg Transmuxing Support** | ❌ None | ❌ Not installed / No root | ✅ Yes (via Docker) | ✅ Full Lossless 4K & Dolby 5.1 |
 | **Realtime Video Streaming** | ❌ Fails after 10s | ⚠️ 1 worker blocks site | ✅ Native ASGI Streaming | ✅ High throughput |
 | **Outbound Internet Access** | ✅ Full access | ❌ Strict Whitelist only | ✅ Full access | ✅ Full access |
-| **Database Persistence (SQLite)**| ❌ Ephemeral (Wiped on reboot) | ✅ Persistent on disk | ⚠️ Ephemeral on free disk* | ✅ Fully persistent |
+| **Ease of Deployment** | Low (Incompatible) | Moderate (Manual WSGI) | **Easiest (1-Click Docker)** | Simple (`docker compose up`) |
 
-> \* *On Render free tier, attach a persistent disk or store SQLite data, or use Supabase/PostgreSQL for multi-instance scaling.*
+> 💡 **Why the JSON Database (`films_over_web.json`) makes Render deployment effortless**:
+> FilmsOverWeb now stores all movie metadata, user accounts, and watch history in a lightweight, thread-safe JSON database (`films_over_web.json`). Because the JSON database is committed directly into the Git repository, **deploying to Render requires ZERO database provisioning or external database addons**. When your app starts up, your entire movie catalog, settings, and users are immediately live!
 
 ---
 

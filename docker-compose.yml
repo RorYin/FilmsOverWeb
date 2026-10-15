@@ -13,13 +13,10 @@ services:
       # - SECRET_KEY=your-secret-key-here
       # - TMDB_API_KEY=your-tmdb-key-here
     volumes:
-      # Persist SQLite database and custom uploads across container updates
-      - filmsoverweb_data:/app/data
+      # Direct JSON database persistence on host
+      - ./films_over_web.json:/app/films_over_web.json
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-volumes:
-  filmsoverweb_data:

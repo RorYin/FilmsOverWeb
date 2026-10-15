@@ -4,9 +4,8 @@ import bcrypt
 import jwt
 from fastapi import Request, HTTPException, status, Depends
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, Session
 from app.models import User
 
 COOKIE_NAME = "fow_token"

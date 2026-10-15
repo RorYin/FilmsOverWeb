@@ -1,46 +1,49 @@
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey
-from sqlalchemy.orm import relationship
-from app.database import Base
-
-def utc_now():
-    return datetime.now(timezone.utc)
+from app.database import (
+    Base, Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, utc_now, get_json_db
+)
 
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False)
-    name = Column(String(255), nullable=True)
-    hashed_password = Column(String(255), nullable=False)
-    role = Column(String(50), default="guest", nullable=False)  # "superadmin", "admin", "guest"
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), default="")
+    name = Column(String(255), default="")
+    hashed_password = Column(String(255), default="")
+    role = Column(String(50), default="guest")  # "superadmin", "admin", "guest"
     is_active = Column(Boolean, default=True)
     must_change_password = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utc_now)
 
-    watch_history = relationship("WatchProgress", back_populates="user", cascade="all, delete-orphan")
+    @property
+    def watch_history(self):
+        return [p for p in get_json_db().get_collection(WatchProgress) if p.user_id == self.id]
+
 
 class DriveFolder(Base):
     __tablename__ = "drive_folders"
 
-    id = Column(Integer, primary_key=True, index=True)
-    folder_id = Column(String(255), unique=True, index=True, nullable=False)
-    folder_name = Column(String(255), nullable=True)
-    folder_url = Column(String(1024), nullable=True)
+    id = Column(Integer, primary_key=True)
+    folder_id = Column(String(255), default="")
+    folder_name = Column(String(255), default="")
+    folder_url = Column(String(1024), default="")
     movie_count = Column(Integer, default=0)
-    last_synced_at = Column(DateTime, nullable=True)
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    last_synced_at = Column(DateTime, default=None)
+    created_by_id = Column(Integer, default=None)
     created_at = Column(DateTime, default=utc_now)
 
-    movies = relationship("Movie", back_populates="folder", cascade="all, delete-orphan")
+    @property
+    def movies(self):
+        return [m for m in get_json_db().get_collection(Movie) if m.folder_id == self.id]
+
 
 class Movie(Base):
     __tablename__ = "movies"
 
-    id = Column(Integer, primary_key=True, index=True)
-    gdrive_file_id = Column(String(255), unique=True, index=True, nullable=False)
-    folder_id = Column(Integer, ForeignKey("drive_folders.id"), nullable=True)
-    file_name = Column(String(500), nullable=False)
+    id = Column(Integer, primary_key=True)
+    gdrive_file_id = Column(String(255), default="")
+    folder_id = Column(Integer, default=None)
+    file_name = Column(String(500), default="")
     file_size = Column(Integer, default=0)
     mime_type = Column(String(100), default="video/mp4")
     
@@ -49,46 +52,58 @@ class Movie(Base):
     resolution = Column(String(50), default="1080p")  # e.g., "4K UHD", "1080p", "720p"
     
     # TMDB & Meta Information
-    tmdb_id = Column(Integer, nullable=True)
-    title = Column(String(500), index=True, nullable=False)
-    original_title = Column(String(500), nullable=True)
-    year = Column(Integer, nullable=True)
-    overview = Column(Text, nullable=True)
-    tagline = Column(String(500), nullable=True)
-    poster_path = Column(String(1024), nullable=True)
-    backdrop_path = Column(String(1024), nullable=True)
+    tmdb_id = Column(Integer, default=None)
+    title = Column(String(500), default="")
+    original_title = Column(String(500), default="")
+    year = Column(Integer, default=None)
+    overview = Column(Text, default="")
+    tagline = Column(String(500), default="")
+    poster_path = Column(String(1024), default="")
+    backdrop_path = Column(String(1024), default="")
     rating = Column(Float, default=0.0)
     vote_count = Column(Integer, default=0)
     duration = Column(Integer, default=0)  # Runtime in minutes
     genres = Column(String(500), default="")  # e.g., "Action, Sci-Fi"
     cast = Column(String(1000), default="")   # Top actors
     director = Column(String(255), default="")
-    trailer_url = Column(String(1024), nullable=True)
+    trailer_url = Column(String(1024), default=None)
     original_language = Column(String(50), default="English")
 
     created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    updated_at = Column(DateTime, default=utc_now)
 
-    folder = relationship("DriveFolder", back_populates="movies")
-    watch_history = relationship("WatchProgress", back_populates="movie", cascade="all, delete-orphan")
+    @property
+    def folder(self):
+        return get_json_db().get_by_id(DriveFolder, self.folder_id)
+
+    @property
+    def watch_history(self):
+        return [p for p in get_json_db().get_collection(WatchProgress) if p.movie_id == self.id]
+
 
 class SystemSetting(Base):
     __tablename__ = "system_settings"
 
-    key = Column(String(100), primary_key=True, index=True)
-    value = Column(Text, nullable=True)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, default=None)
+    updated_at = Column(DateTime, default=utc_now)
+
 
 class WatchProgress(Base):
     __tablename__ = "watch_progress"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    movie_id = Column(Integer, ForeignKey("movies.id"), nullable=False)
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, default=None)
+    movie_id = Column(Integer, default=None)
     position_seconds = Column(Float, default=0.0)
     duration_seconds = Column(Float, default=0.0)
     completed = Column(Boolean, default=False)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    updated_at = Column(DateTime, default=utc_now)
 
-    user = relationship("User", back_populates="watch_history")
-    movie = relationship("Movie", back_populates="watch_history")
+    @property
+    def user(self):
+        return get_json_db().get_by_id(User, self.user_id)
+
+    @property
+    def movie(self):
+        return get_json_db().get_by_id(Movie, self.movie_id)

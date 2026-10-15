@@ -2,7 +2,7 @@ import re
 import json
 import httpx
 from typing import List, Dict, Any, Optional, Tuple
-from sqlalchemy.orm import Session
+from app.database import Session
 from app.config import settings
 from app.models import SystemSetting
 from app.parser import is_video_file

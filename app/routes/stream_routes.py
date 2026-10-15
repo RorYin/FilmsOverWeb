@@ -5,8 +5,7 @@ from typing import Tuple, Optional
 import httpx
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Response
 from fastapi.responses import StreamingResponse, JSONResponse
-from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import get_db, Session
 from app.models import Movie, User, WatchProgress
 from app.auth import get_current_user, get_current_user_optional, create_access_token
 from app.gdrive import get_google_credentials_info, get_access_token, DRIVE_V3_FILES_URL

@@ -1,6 +1,6 @@
 import httpx
 from typing import Optional, Dict, Any, Tuple
-from sqlalchemy.orm import Session
+from app.database import Session
 from app.config import settings
 from app.models import SystemSetting, Movie
 

@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import get_db, Session
 from app.models import User
 from app.auth import verify_password, get_password_hash, create_access_token, COOKIE_NAME, get_current_user_optional
 from app.mailer import generate_secure_password, send_password_reset_email

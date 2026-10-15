@@ -4,7 +4,7 @@ import string
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Tuple, Optional
-from sqlalchemy.orm import Session
+from app.database import Session
 from app.config import settings
 from app.models import SystemSetting
 

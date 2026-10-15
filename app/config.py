@@ -5,6 +5,7 @@ from pydantic import BaseModel
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 class AppConfig(BaseModel):
+    DATABASE_FILE: str = os.getenv("DATABASE_FILE", str(BASE_DIR / "films_over_web.json"))
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'films_over_web.db'}")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "films-over-web-super-secret-key-change-me-2026")
     ALGORITHM: str = "HS256"

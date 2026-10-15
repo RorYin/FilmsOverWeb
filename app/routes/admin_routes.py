@@ -2,8 +2,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, BackgroundTasks, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from app.database import get_db
+from app.database import get_db, Session
 from app.models import User, DriveFolder, Movie
 from app.auth import get_current_user, require_role, get_password_hash
 from app.gdrive import extract_folder_id, list_files_in_drive_folder, fetch_folder_metadata
