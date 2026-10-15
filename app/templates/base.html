@@ -77,20 +77,22 @@
                     </form>
 
                     <!-- User Profile Pill & Comprehensive Management Dropdown -->
-                    <div class="relative group">
-                        <button class="flex items-center space-x-2 bg-brand-surface border border-brand-border px-3 py-1.5 rounded-full hover:border-slate-500 transition cursor-pointer">
-                            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center font-black text-xs text-black uppercase shadow-sm">
+                    <div class="relative" id="user-menu-container">
+                        <button type="button" id="user-menu-button" aria-expanded="false" aria-haspopup="true" class="flex items-center space-x-2 bg-brand-surface border border-brand-border px-3 py-1.5 rounded-full hover:border-slate-500 focus:outline-none transition cursor-pointer select-none">
+                            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center font-black text-xs text-black uppercase shadow-sm pointer-events-none">
                                 {{ user.name[:1] if user.name else user.email[:1] }}
                             </div>
-                            <span class="text-xs font-semibold hidden md:inline text-slate-200">{{ user.name or user.email.split('@')[0] }}</span>
-                            <span class="text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded {% if user.role == 'superadmin' %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% elif user.role == 'admin' %}bg-blue-500/20 text-blue-300 border border-blue-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
+                            <span class="text-xs font-semibold hidden md:inline text-slate-200 pointer-events-none">{{ user.name or user.email.split('@')[0] }}</span>
+                            <span class="text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded pointer-events-none {% if user.role == 'superadmin' %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% elif user.role == 'admin' %}bg-blue-500/20 text-blue-300 border border-blue-500/30{% else %}bg-emerald-500/20 text-emerald-300 border border-emerald-500/30{% endif %}">
                                 {{ user.role }}
                             </span>
-                            <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                            <span id="user-menu-arrow" class="inline-flex items-center transition-transform duration-200 pointer-events-none">
+                                <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                            </span>
                         </button>
                         
                         <!-- Dropdown Menu with Home, Library, TV Shows and Admin Options -->
-                        <div class="absolute right-0 mt-2 w-56 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl py-2 hidden group-hover:block transition-all z-50 backdrop-blur-xl">
+                        <div id="user-menu-dropdown" class="absolute right-0 mt-2 w-56 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl py-2 hidden transition-all z-50 backdrop-blur-xl">
                             <div class="px-4 py-2 border-b border-brand-border text-xs text-slate-400">
                                 Signed in as<br>
                                 <span class="font-medium text-slate-200 truncate block">{{ user.email }}</span>
@@ -177,6 +179,45 @@
 
     <script>
         lucide.createIcons();
+
+        // User dropdown menu click-toggle
+        (function() {
+            const userBtn = document.getElementById('user-menu-button');
+            const userDropdown = document.getElementById('user-menu-dropdown');
+            const userArrow = document.getElementById('user-menu-arrow');
+
+            if (userBtn && userDropdown) {
+                userBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const isHidden = userDropdown.classList.contains('hidden');
+                    if (isHidden) {
+                        userDropdown.classList.remove('hidden');
+                        userBtn.setAttribute('aria-expanded', 'true');
+                        if (userArrow) userArrow.classList.add('rotate-180');
+                    } else {
+                        userDropdown.classList.add('hidden');
+                        userBtn.setAttribute('aria-expanded', 'false');
+                        if (userArrow) userArrow.classList.remove('rotate-180');
+                    }
+                });
+
+                document.addEventListener('click', function(e) {
+                    if (!userDropdown.contains(e.target) && !userBtn.contains(e.target)) {
+                        userDropdown.classList.add('hidden');
+                        userBtn.setAttribute('aria-expanded', 'false');
+                        if (userArrow) userArrow.classList.remove('rotate-180');
+                    }
+                });
+
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape' && !userDropdown.classList.contains('hidden')) {
+                        userDropdown.classList.add('hidden');
+                        userBtn.setAttribute('aria-expanded', 'false');
+                        if (userArrow) userArrow.classList.remove('rotate-180');
+                    }
+                });
+            }
+        })();
     </script>
     {% block scripts %}{% endblock %}
 </body>
