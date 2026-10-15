@@ -6,6 +6,8 @@ from app.database import engine, Base, SessionLocal
 from app.auth import init_default_users
 from app.routes import auth_routes, movie_routes, series_routes, stream_routes, admin_routes, superadmin_routes
 
+import os
+import re
 import asyncio
 from app.config import settings
 from app.models import DriveFolder
@@ -13,26 +15,30 @@ from app.gdrive import extract_folder_id, fetch_folder_metadata
 from app.routes.admin_routes import perform_sync_folder
 
 async def init_default_folders(db: SessionLocal):
-    folder_url = settings.DEFAULT_DRIVE_FOLDER_URL
-    if not folder_url:
+    raw_urls = os.getenv("DRIVE_FOLDER_URLS") or settings.DEFAULT_DRIVE_FOLDER_URL or ""
+    if not raw_urls.strip():
         return
-    folder_id = extract_folder_id(folder_url)
-    if not folder_id:
-        return
-    existing = db.query(DriveFolder).filter(DriveFolder.folder_id == folder_id).first()
-    if not existing:
-        meta = await fetch_folder_metadata(folder_id, db)
-        name = meta.get("name") or "GDFlix (Cinema Vault)"
-        folder = DriveFolder(
-            folder_id=folder_id,
-            folder_name=name,
-            folder_url=folder_url
-        )
-        db.add(folder)
-        db.commit()
-        db.refresh(folder)
-        print(f"[STARTUP] Registered default Google Drive folder: {folder.folder_name} ({folder_id})")
-        asyncio.create_task(perform_sync_folder(folder.id, SessionLocal))
+
+    url_list = [u.strip() for u in re.split(r'[,;\n\r]+', raw_urls) if u.strip()]
+
+    for folder_url in url_list:
+        folder_id = extract_folder_id(folder_url)
+        if not folder_id:
+            continue
+        existing = db.query(DriveFolder).filter(DriveFolder.folder_id == folder_id).first()
+        if not existing:
+            meta = await fetch_folder_metadata(folder_id, db)
+            name = meta.get("name") or f"Drive Folder ({folder_id[:8]}...)"
+            folder = DriveFolder(
+                folder_id=folder_id,
+                folder_name=name,
+                folder_url=folder_url
+            )
+            db.add(folder)
+            db.commit()
+            db.refresh(folder)
+            print(f"[STARTUP] Registered Google Drive folder: {folder.folder_name} ({folder_id})")
+            asyncio.create_task(perform_sync_folder(folder.id, SessionLocal))
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
