@@ -3,36 +3,11 @@
 {% block title %}Watching {{ movie.title }} - FilmsOverWeb Cinema{% endblock %}
 
 {% block head %}
-<!-- Plyr CSS for modern OTT controls -->
-<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
 <!-- MoviPlayer Web Component for Client-Side WASM + WebCodecs decoding (MKV, HEVC, AV1, Dolby, DTS) -->
 <script type="module" src="https://cdn.jsdelivr.net/npm/movi-player/dist/element.js"></script>
 <style>
-    :root {
-        --plyr-color-main: #e5a00d;
-        --plyr-video-background: #000000;
-        --plyr-control-radius: 8px;
-    }
-    .plyr--video {
-        border-radius: 14px;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9);
-    }
     .cinema-backdrop {
         background: radial-gradient(circle at center, #181d28 0%, #08090b 85%);
-    }
-    /* Fullscreen auto-hide styling */
-    .plyr--fullscreen-active.autohide-controls {
-        cursor: none !important;
-    }
-    .plyr--fullscreen-active.autohide-controls .plyr__controls,
-    .plyr--fullscreen-active.autohide-controls .plyr__caption {
-        opacity: 0 !important;
-        pointer-events: none !important;
-        transform: translateY(14px);
-        transition: opacity 0.4s ease, transform 0.4s ease !important;
-    }
-    .plyr--fullscreen-active .plyr__controls {
-        transition: opacity 0.25s ease, transform 0.25s ease !important;
     }
 </style>
 {% endblock %}
@@ -58,28 +33,6 @@
             </div>
 
             <div class="flex items-center space-x-2.5">
-                {% if cloudflare_worker_url %}
-                <span class="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" title="Video stream is routed directly through Cloudflare Edge with 0 MB Render bandwidth">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Direct Cloudflare Stream (0 MB Server Load)</span>
-                </span>
-                {% else %}
-                <a href="/superadmin/settings" class="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition" title="Click to configure Cloudflare Stream Worker for zero-bandwidth streaming">
-                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
-                    <span>Server Bridge &bull; Setup Cloudflare Stream &rarr;</span>
-                </a>
-                {% endif %}
-
-                <!-- Engine Selector -->
-                <div class="inline-flex p-1 bg-slate-900 border border-slate-700/80 rounded-xl text-xs shadow-inner">
-                    <button type="button" id="btn-engine-wasm" onclick="switchPlayerEngine('wasm')" class="px-2.5 py-1 rounded-lg font-bold transition bg-brand-red text-black shadow-sm" title="Client-Side WebAssembly & WebCodecs GPU decoding">
-                        ⚡ WASM Client
-                    </button>
-                    <button type="button" id="btn-engine-native" onclick="switchPlayerEngine('native')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition" title="Native HTML5 / Server Remuxer">
-                        Native HTML5
-                    </button>
-                </div>
-
                 <!-- Quality Option While Playing (if multiple resolutions available in Google Drive) -->
                 {% if quality_versions and quality_versions|length > 1 %}
                 <div class="relative" id="quality-selector-wrapper">
@@ -118,25 +71,15 @@
             </div>
         </div>
 
-        <!-- Video Player Container -->
-        <div class="relative bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl">
-            <!-- WASM WebCodecs Player (movi-player) -->
-            <div id="wasm-player-container" class="w-full aspect-video">
-                <movi-player id="movi-player"
-                             src=""
-                             controls
-                             playsinline
-                             doubletap
-                             class="w-full h-full block">
-                </movi-player>
-            </div>
-
-            <!-- Native HTML5 Video Player Container (Hidden by default unless switched) -->
-            <div id="native-player-container" class="w-full aspect-video hidden">
-                <video id="player" playsinline controls preload="auto" class="w-full aspect-video">
-                    Your web browser does not support the video tag.
-                </video>
-            </div>
+        <!-- Video Player Container (Client-Side WASM + WebCodecs GPU decoding) -->
+        <div id="player-container" class="relative bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl aspect-video">
+            <movi-player id="movi-player"
+                         src=""
+                         controls
+                         playsinline
+                         doubletap
+                         class="w-full h-full block">
+            </movi-player>
         </div>
 
         <!-- Clean Subtle Shortcuts Guide -->
@@ -153,8 +96,6 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- Plyr Script -->
-<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const cfWorkerUrl = "{{ cloudflare_worker_url or '' }}".trim().replace(/\/+$/, '');
@@ -168,39 +109,21 @@
         let currentMovieId = parseInt("{{ movie.id }}");
         let currentGdriveId = gdriveFileId;
         let currentFileName = fileName;
-        let currentOffset = (initialPosition > 5) ? Math.floor(initialPosition) : 0;
-        let isSeekingReload = false;
-        let isUserSeeking = false;
-        let seekDebounceTimer = null;
-        let activeEngine = 'wasm';
 
-        const wasmContainer = document.getElementById('wasm-player-container');
-        const nativeContainer = document.getElementById('native-player-container');
+        const playerContainer = document.getElementById('player-container');
         const moviPlayer = document.getElementById('movi-player');
-        const videoElement = document.getElementById('player');
-        const btnWasm = document.getElementById('btn-engine-wasm');
-        const btnNative = document.getElementById('btn-engine-native');
 
-        function buildStreamUrl(forEngine, movieIdParam, fileIdParam, fileNameParam, targetSeconds = 0) {
-            if (forEngine === 'wasm') {
-                if (cfWorkerUrl) {
-                    let u = `${cfWorkerUrl}/?file_id=${encodeURIComponent(fileIdParam)}&name=${encodeURIComponent(fileNameParam)}`;
-                    if (googleApiKey) u += `&key=${encodeURIComponent(googleApiKey)}`;
-                    return u;
-                }
-                return `/stream/raw/${movieIdParam}?token=${encodeURIComponent(userToken)}`;
-            } else {
-                let u = `/stream/${movieIdParam}`;
-                const params = [];
-                if (userToken) params.push(`token=${encodeURIComponent(userToken)}`);
-                if (targetSeconds > 5) params.push(`ss=${Math.floor(targetSeconds)}`);
-                if (params.length > 0) u += `?${params.join('&')}`;
+        function buildStreamUrl(movieIdParam, fileIdParam, fileNameParam) {
+            if (cfWorkerUrl) {
+                let u = `${cfWorkerUrl}/?file_id=${encodeURIComponent(fileIdParam)}&name=${encodeURIComponent(fileNameParam)}`;
+                if (googleApiKey) u += `&key=${encodeURIComponent(googleApiKey)}`;
                 return u;
             }
+            return `/stream/raw/${movieIdParam}?token=${encodeURIComponent(userToken)}`;
         }
 
-        // Initialize WASM Player (Default)
-        const initialWasmUrl = buildStreamUrl('wasm', currentMovieId, currentGdriveId, currentFileName);
+        // Initialize WASM Player
+        const initialWasmUrl = buildStreamUrl(currentMovieId, currentGdriveId, currentFileName);
         moviPlayer.setAttribute('src', initialWasmUrl);
 
         if (initialPosition > 5) {
@@ -209,14 +132,13 @@
             }, { once: true });
         }
 
-        // Progress reporting for WASM player
-        let lastWasmReport = 0;
+        // Progress reporting (every 8 seconds and on pause)
+        let lastReportTime = 0;
         moviPlayer.addEventListener('timeupdate', () => {
-            if (activeEngine !== 'wasm') return;
             const cur = moviPlayer.currentTime || 0;
             const dur = totalDuration > 0 ? totalDuration : (moviPlayer.duration || 0);
-            if (Math.abs(cur - lastWasmReport) >= 8) {
-                lastWasmReport = cur;
+            if (Math.abs(cur - lastReportTime) >= 8) {
+                lastReportTime = cur;
                 fetch(`/api/movies/${currentMovieId}/progress`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -226,7 +148,6 @@
         });
 
         moviPlayer.addEventListener('pause', () => {
-            if (activeEngine !== 'wasm') return;
             const cur = moviPlayer.currentTime || 0;
             const dur = totalDuration > 0 ? totalDuration : (moviPlayer.duration || 0);
             fetch(`/api/movies/${currentMovieId}/progress`, {
@@ -236,228 +157,7 @@
             }).catch(e => {});
         });
 
-        window.switchPlayerEngine = function(engine) {
-            if (engine === activeEngine) return;
-            let currentPlayhead = 0;
-            if (activeEngine === 'wasm') {
-                currentPlayhead = moviPlayer.currentTime || 0;
-                try { moviPlayer.pause(); } catch(e){}
-            } else {
-                currentPlayhead = (player && typeof player.currentTime === 'number') ? player.currentTime : (videoElement.currentTime || 0);
-                try { videoElement.pause(); } catch(e){}
-            }
-
-            activeEngine = engine;
-
-            if (engine === 'wasm') {
-                wasmContainer.classList.remove('hidden');
-                nativeContainer.classList.add('hidden');
-                btnWasm.className = "px-2.5 py-1 rounded-lg font-bold transition bg-brand-red text-black shadow-sm";
-                btnNative.className = "px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition";
-                if (currentPlayhead > 0) {
-                    moviPlayer.currentTime = currentPlayhead;
-                }
-            } else {
-                wasmContainer.classList.add('hidden');
-                nativeContainer.classList.remove('hidden');
-                btnNative.className = "px-2.5 py-1 rounded-lg font-bold transition bg-brand-red text-black shadow-sm";
-                btnWasm.className = "px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition";
-                if (currentPlayhead > 0) {
-                    seekToTarget(currentPlayhead);
-                }
-            }
-        };
-
-        function formatTime(seconds) {
-            seconds = Math.max(0, Math.floor(seconds));
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            const s = seconds % 60;
-            if (h > 0) {
-                return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
-            }
-            return `${m}:${s < 10 ? '0' : ''}${s}`;
-        }
-
-        // Configure Plyr options
-        const plyrOptions = {
-            controls: [
-                'play-large',
-                'restart',
-                'rewind',
-                'play',
-                'fast-forward',
-                'progress',
-                'current-time',
-                'duration',
-                'mute',
-                'volume',
-                'settings',
-                'pip',
-                'airplay',
-                'fullscreen'
-            ],
-            duration: totalDuration > 0 ? totalDuration : undefined,
-            seekTime: 10,
-            keyboard: { focused: true, global: true },
-            tooltips: { controls: true, seek: true },
-            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
-        };
-
-        // Initialize Plyr
-        const player = new Plyr(videoElement, plyrOptions);
-
-        // Bind custom currentTime getter & setter on Plyr player instance.
-        // This ensures Plyr's entire timeline UI, seekbar position, dragging, tooltips,
-        // and keyboard/button controls stay 100% in sync with our backend stream remuxer (?ss=)
-        Object.defineProperty(player, 'currentTime', {
-            get() {
-                return currentOffset + (videoElement.currentTime || 0);
-            },
-            set(targetSeconds) {
-                if (isSeekingReload) return;
-                debouncedSeek(targetSeconds);
-            },
-            configurable: true
-        });
-
-        function debouncedSeek(targetSeconds) {
-            targetSeconds = Math.max(0, Math.min(targetSeconds, totalDuration > 0 ? totalDuration - 1 : targetSeconds));
-            
-            // Immediately reflect targeted time on display for snappy responsiveness
-            if (player.elements.display && player.elements.display.currentTime) {
-                player.elements.display.currentTime.innerText = formatTime(targetSeconds);
-            }
-
-            if (seekDebounceTimer) clearTimeout(seekDebounceTimer);
-            seekDebounceTimer = setTimeout(() => {
-                seekToTarget(targetSeconds);
-            }, 120);
-        }
-
-        // Fast timeline seeking: requests transmux stream starting at selected playhead
-        function seekToTarget(targetSeconds) {
-            if (seekDebounceTimer) {
-                clearTimeout(seekDebounceTimer);
-                seekDebounceTimer = null;
-            }
-
-            targetSeconds = Math.max(0, Math.min(targetSeconds, totalDuration > 0 ? totalDuration - 1 : targetSeconds));
-
-            // Check if target is already inside video element's local buffered range
-            const localTarget = targetSeconds - currentOffset;
-            let canLocalSeek = false;
-            if (localTarget >= 0 && videoElement.buffered.length > 0) {
-                for (let i = 0; i < videoElement.buffered.length; i++) {
-                    if (localTarget >= videoElement.buffered.start(i) && localTarget < (videoElement.buffered.end(i) - 0.5)) {
-                        canLocalSeek = true;
-                        break;
-                    }
-                }
-            }
-
-            if (canLocalSeek) {
-                videoElement.currentTime = localTarget;
-                return;
-            }
-
-            // Perform server-side transmux seek via ?ss=
-            isSeekingReload = true;
-            currentOffset = Math.floor(targetSeconds);
-
-            const tokenQuery = userToken ? `&token=${encodeURIComponent(userToken)}` : '';
-            const newSrc = `/stream/${currentMovieId}?ss=${currentOffset}${tokenQuery}`;
-            videoElement.src = newSrc;
-            videoElement.load();
-            videoElement.play().catch(e => {});
-
-            // Update seekbar and display immediately so playhead stays at seek position
-            if (totalDuration > 0 && player.elements.inputs && player.elements.inputs.seek) {
-                const pct = (currentOffset / totalDuration) * 100;
-                player.elements.inputs.seek.value = pct;
-                if (player.elements.progress) {
-                    player.elements.progress.value = pct;
-                }
-            }
-            if (player.elements.display && player.elements.display.currentTime) {
-                player.elements.display.currentTime.innerText = formatTime(currentOffset);
-            }
-
-            const onResumed = () => {
-                isSeekingReload = false;
-                isUserSeeking = false;
-                videoElement.removeEventListener('playing', onResumed);
-                videoElement.removeEventListener('canplay', onResumed);
-            };
-            videoElement.addEventListener('playing', onResumed, { once: true });
-            videoElement.addEventListener('canplay', onResumed, { once: true });
-
-            setTimeout(() => {
-                isSeekingReload = false;
-                isUserSeeking = false;
-            }, 3500);
-        }
-
-        // Set initial duration and playhead text when Plyr is ready
-        player.on('ready', () => {
-            if (totalDuration > 0 && player.elements.display && player.elements.display.duration) {
-                player.elements.display.duration.innerText = formatTime(totalDuration);
-            }
-            if (currentOffset > 0 && player.elements.display && player.elements.display.currentTime) {
-                player.elements.display.currentTime.innerText = formatTime(currentOffset);
-            }
-            if (totalDuration > 0 && player.elements.inputs && player.elements.inputs.seek && currentOffset > 0) {
-                const pct = (currentOffset / totalDuration) * 100;
-                player.elements.inputs.seek.value = pct;
-                if (player.elements.progress) {
-                    player.elements.progress.value = pct;
-                }
-            }
-
-            // Direct listeners on seek input for drag/click commitment
-            const seekInput = player.elements.inputs ? player.elements.inputs.seek : null;
-            if (seekInput) {
-                const onStart = () => { isUserSeeking = true; };
-                const onEnd = () => {
-                    if (seekDebounceTimer) {
-                        clearTimeout(seekDebounceTimer);
-                        seekDebounceTimer = null;
-                    }
-                    if (totalDuration > 0) {
-                        const pct = parseFloat(seekInput.value) || 0;
-                        seekToTarget((pct / 100) * totalDuration);
-                    }
-                    setTimeout(() => { isUserSeeking = false; }, 200);
-                };
-
-                seekInput.addEventListener('pointerdown', onStart);
-                seekInput.addEventListener('mousedown', onStart);
-                seekInput.addEventListener('touchstart', onStart, { passive: true });
-
-                seekInput.addEventListener('change', onEnd);
-                seekInput.addEventListener('pointerup', onEnd);
-                seekInput.addEventListener('mouseup', onEnd);
-                seekInput.addEventListener('touchend', onEnd);
-            }
-
-            // Custom handler for Plyr's rewind and fast-forward buttons
-            if (player.elements.buttons) {
-                if (player.elements.buttons.rewind) {
-                    player.elements.buttons.rewind.addEventListener('click', (e) => {
-                        e.stopImmediatePropagation();
-                        stepSeek(-10);
-                    }, true);
-                }
-                if (player.elements.buttons.fastForward) {
-                    player.elements.buttons.fastForward.addEventListener('click', (e) => {
-                        e.stopImmediatePropagation();
-                        stepSeek(10);
-                    }, true);
-                }
-            }
-        });
-
-        // Seamless Quality Switcher: preserves exact playback position across resolutions
+        // Seamless Quality Switcher
         window.switchQuality = function(targetId, targetResolution, qualityVal) {
             if (targetId === currentMovieId) return;
 
@@ -466,20 +166,18 @@
                 currentFileName = qObj.file_name || currentFileName;
                 currentGdriveId = qObj.gdrive_file_id || currentGdriveId;
             }
-            const currentTotal = activeEngine === 'wasm' ? (moviPlayer.currentTime || 0) : (currentOffset + (videoElement.currentTime || 0));
+            const currentTotal = moviPlayer.currentTime || 0;
             currentMovieId = targetId;
 
             // Update browser URL without reloading page
             window.history.replaceState(null, '', `/watch/${targetId}`);
 
-            if (activeEngine === 'wasm') {
-                moviPlayer.setAttribute('src', buildStreamUrl('wasm', targetId, currentGdriveId, currentFileName));
-                moviPlayer.addEventListener('loadedmetadata', () => {
+            moviPlayer.setAttribute('src', buildStreamUrl(targetId, currentGdriveId, currentFileName));
+            moviPlayer.addEventListener('loadedmetadata', () => {
+                if (currentTotal > 0) {
                     moviPlayer.currentTime = currentTotal;
-                }, { once: true });
-            } else {
-                seekToTarget(currentTotal);
-            }
+                }
+            }, { once: true });
 
             // Update Top Bar Quality Label
             const labelEl = document.getElementById('current-quality-label');
@@ -518,127 +216,46 @@
             });
         }
 
-        // Smooth 10s Rewind / Fast Forward handler
-        function stepSeek(delta) {
-            const currentTotal = currentOffset + (videoElement.currentTime || 0);
-            seekToTarget(currentTotal + delta);
-        }
-
-        // Keyboard arrow seeking
+        // Global Keyboard Shortcuts
         window.addEventListener('keydown', (e) => {
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-            if (e.key === 'ArrowLeft') {
+
+            if (e.code === 'Space') {
                 e.preventDefault();
-                stepSeek(-10);
+                if (moviPlayer.paused) {
+                    moviPlayer.play().catch(err => {});
+                } else {
+                    moviPlayer.pause();
+                }
+            } else if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                moviPlayer.currentTime = Math.max(0, (moviPlayer.currentTime || 0) - 10);
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
-                stepSeek(10);
-            }
-        });
-
-        // Keep timeline time display in sync and save progress every 8s
-        let lastReportTime = 0;
-        player.on('timeupdate', () => {
-            if (isSeekingReload || isUserSeeking || seekDebounceTimer) return;
-
-            const currentTotal = currentOffset + (videoElement.currentTime || 0);
-            const fullDuration = totalDuration > 0 ? totalDuration : (player.duration || 0);
-
-            if (player.elements.display && player.elements.display.currentTime) {
-                player.elements.display.currentTime.innerText = formatTime(currentTotal);
-            }
-            if (totalDuration > 0 && player.elements.display && player.elements.display.duration) {
-                player.elements.display.duration.innerText = formatTime(totalDuration);
-            }
-            if (totalDuration > 0 && player.elements.inputs && player.elements.inputs.seek) {
-                const pct = (currentTotal / totalDuration) * 100;
-                player.elements.inputs.seek.value = pct;
-                if (player.elements.progress) {
-                    player.elements.progress.value = pct;
+                const dur = totalDuration > 0 ? totalDuration : (moviPlayer.duration || 999999);
+                moviPlayer.currentTime = Math.min(dur, (moviPlayer.currentTime || 0) + 10);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                moviPlayer.volume = Math.min(1.0, (moviPlayer.volume ?? 1.0) + 0.1);
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                moviPlayer.volume = Math.max(0.0, (moviPlayer.volume ?? 1.0) - 0.1);
+            } else if (e.key === 'f' || e.key === 'F') {
+                e.preventDefault();
+                if (!document.fullscreenElement) {
+                    if (playerContainer.requestFullscreen) {
+                        playerContainer.requestFullscreen();
+                    } else if (moviPlayer.requestFullscreen) {
+                        moviPlayer.requestFullscreen();
+                    }
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
                 }
-            }
-
-            if (Math.abs(currentTotal - lastReportTime) >= 8) {
-                lastReportTime = currentTotal;
-                fetch(`/api/movies/${currentMovieId}/progress`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        position: currentTotal,
-                        duration: fullDuration
-                    })
-                }).catch(e => {});
-            }
-        });
-
-        // Save progress when paused
-        player.on('pause', () => {
-            const currentTotal = currentOffset + (videoElement.currentTime || 0);
-            const fullDuration = totalDuration > 0 ? totalDuration : (player.duration || 0);
-            fetch(`/api/movies/${currentMovieId}/progress`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    position: currentTotal,
-                    duration: fullDuration
-                })
-            }).catch(e => {});
-        });
-
-        // Fullscreen dynamic controls auto-hide & mouse activity detection
-        let fsHideTimer = null;
-        const playerContainer = player.elements.container;
-
-        function hideFsControls() {
-            if (player.fullscreen && player.fullscreen.active && !player.paused) {
-                playerContainer.classList.add('autohide-controls');
-            }
-        }
-
-        function showFsControls() {
-            playerContainer.classList.remove('autohide-controls');
-            clearTimeout(fsHideTimer);
-            if (player.fullscreen && player.fullscreen.active && !player.paused) {
-                fsHideTimer = setTimeout(hideFsControls, 2400);
-            }
-        }
-
-        player.on('enterfullscreen', () => {
-            clearTimeout(fsHideTimer);
-            fsHideTimer = setTimeout(hideFsControls, 2000);
-        });
-
-        player.on('exitfullscreen', () => {
-            clearTimeout(fsHideTimer);
-            playerContainer.classList.remove('autohide-controls');
-        });
-
-        playerContainer.addEventListener('mousemove', () => {
-            if (player.fullscreen && player.fullscreen.active) {
-                showFsControls();
-            }
-        });
-
-        playerContainer.addEventListener('pointermove', () => {
-            if (player.fullscreen && player.fullscreen.active) {
-                showFsControls();
-            }
-        });
-
-        playerContainer.addEventListener('touchstart', () => {
-            if (player.fullscreen && player.fullscreen.active) {
-                showFsControls();
-            }
-        }, { passive: true });
-
-        player.on('pause', () => {
-            clearTimeout(fsHideTimer);
-            playerContainer.classList.remove('autohide-controls');
-        });
-
-        player.on('play', () => {
-            if (player.fullscreen && player.fullscreen.active) {
-                fsHideTimer = setTimeout(hideFsControls, 2000);
+            } else if (e.key === 'm' || e.key === 'M') {
+                e.preventDefault();
+                moviPlayer.muted = !moviPlayer.muted;
             }
         });
     });
