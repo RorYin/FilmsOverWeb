@@ -19,6 +19,9 @@ class AppConfig(BaseModel):
     # TMDB Defaults
     TMDB_API_KEY: str = os.getenv("TMDB_API_KEY", "")
 
+    # Cloudflare Stream Worker (Option B: Zero-Bandwidth Direct Client Streaming)
+    CLOUDFLARE_WORKER_URL: str = os.getenv("CLOUDFLARE_WORKER_URL", "")
+
     # Gmail SMTP Automation Defaults
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))

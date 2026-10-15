@@ -60,6 +60,7 @@ def get_quality_versions(movie: Movie, db: Session):
             "file_size": size_str,
             "codec": m.codec or "",
             "file_name": m.file_name,
+            "gdrive_file_id": m.gdrive_file_id,
             "is_active": (m.id == movie.id)
         })
 
@@ -256,6 +257,14 @@ async def watch_player(
     # All available quality/resolution versions of this movie in Google Drive
     quality_versions = get_quality_versions(movie, db)
 
+    from app.models import SystemSetting
+    from app.config import settings
+    cf_worker_row = db.query(SystemSetting).filter(SystemSetting.key == "cloudflare_worker_url").first()
+    cloudflare_worker_url = cf_worker_row.value.strip() if cf_worker_row and cf_worker_row.value else settings.CLOUDFLARE_WORKER_URL
+
+    google_api_key_row = db.query(SystemSetting).filter(SystemSetting.key == "google_api_key").first()
+    google_api_key = google_api_key_row.value.strip() if google_api_key_row and google_api_key_row.value else settings.GOOGLE_API_KEY
+
     return templates.TemplateResponse(
         request=request,
         name="watch.html",
@@ -265,7 +274,9 @@ async def watch_player(
             "initial_time": initial_time,
             "user_token": user_token,
             "needs_transmux": needs_transmux,
-            "quality_versions": quality_versions
+            "quality_versions": quality_versions,
+            "cloudflare_worker_url": cloudflare_worker_url,
+            "google_api_key": google_api_key
         }
     )
 

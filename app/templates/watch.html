@@ -5,6 +5,8 @@
 {% block head %}
 <!-- Plyr CSS for modern OTT controls -->
 <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+<!-- MoviPlayer Web Component for Client-Side WASM + WebCodecs decoding (MKV, HEVC, AV1, Dolby, DTS) -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/movi-player/dist/element.js"></script>
 <style>
     :root {
         --plyr-color-main: #e5a00d;
@@ -55,49 +57,86 @@
                 </div>
             </div>
 
-            <!-- Quality Option While Playing (if multiple resolutions available in Google Drive) -->
-            {% if quality_versions and quality_versions|length > 1 %}
-            <div class="relative" id="quality-selector-wrapper">
-                <button id="quality-btn" type="button" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm cursor-pointer" title="Select Stream Quality">
-                    <i data-lucide="layers" class="w-4 h-4 text-brand-red"></i>
-                    <span id="current-quality-label">{{ movie.resolution }}</span>
-                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
-                </button>
+            <div class="flex items-center space-x-2.5">
+                {% if cloudflare_worker_url %}
+                <span class="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" title="Video stream is routed directly through Cloudflare Edge with 0 MB Render bandwidth">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Direct Cloudflare Stream (0 MB Server Load)</span>
+                </span>
+                {% else %}
+                <a href="/superadmin/settings" class="hidden md:inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition" title="Click to configure Cloudflare Stream Worker for zero-bandwidth streaming">
+                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span>Server Bridge &bull; Setup Cloudflare Stream &rarr;</span>
+                </a>
+                {% endif %}
 
-                <!-- Quality Dropdown Menu -->
-                <div id="quality-dropdown" class="hidden absolute right-0 mt-2 w-60 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl py-2 z-50 backdrop-blur-xl">
-                    <div class="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 mb-1">
-                        Select Stream Quality
-                    </div>
-                    {% for q in quality_versions %}
-                    <button type="button"
-                            onclick="switchQuality({{ q.id }}, '{{ q.resolution }}', {{ q.quality_val }})"
-                            class="quality-item-btn w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer {% if q.is_active %}text-brand-red font-bold bg-brand-red/10{% else %}text-slate-200{% endif %}"
-                            data-movie-id="{{ q.id }}"
-                            data-resolution="{{ q.resolution }}"
-                            data-quality-val="{{ q.quality_val }}">
-                        <div class="flex items-center space-x-2">
-                            <span>{{ q.resolution }}</span>
-                            {% if q.file_size %}
-                            <span class="text-[10px] text-slate-400 font-normal">({{ q.file_size }})</span>
-                            {% endif %}
-                        </div>
-                        <span class="active-check {% if not q.is_active %}hidden{% endif %}">
-                            <i data-lucide="check" class="w-3.5 h-3.5 text-brand-red"></i>
-                        </span>
+                <!-- Engine Selector -->
+                <div class="inline-flex p-1 bg-slate-900 border border-slate-700/80 rounded-xl text-xs shadow-inner">
+                    <button type="button" id="btn-engine-wasm" onclick="switchPlayerEngine('wasm')" class="px-2.5 py-1 rounded-lg font-bold transition bg-brand-red text-black shadow-sm" title="Client-Side WebAssembly & WebCodecs GPU decoding">
+                        ⚡ WASM Client
                     </button>
-                    {% endfor %}
+                    <button type="button" id="btn-engine-native" onclick="switchPlayerEngine('native')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition" title="Native HTML5 / Server Remuxer">
+                        Native HTML5
+                    </button>
                 </div>
+
+                <!-- Quality Option While Playing (if multiple resolutions available in Google Drive) -->
+                {% if quality_versions and quality_versions|length > 1 %}
+                <div class="relative" id="quality-selector-wrapper">
+                    <button id="quality-btn" type="button" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm cursor-pointer" title="Select Stream Quality">
+                        <i data-lucide="layers" class="w-4 h-4 text-brand-red"></i>
+                        <span id="current-quality-label">{{ movie.resolution }}</span>
+                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                    </button>
+
+                    <!-- Quality Dropdown Menu -->
+                    <div id="quality-dropdown" class="hidden absolute right-0 mt-2 w-60 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl py-2 z-50 backdrop-blur-xl">
+                        <div class="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 mb-1">
+                            Select Stream Quality
+                        </div>
+                        {% for q in quality_versions %}
+                        <button type="button"
+                                onclick="switchQuality({{ q.id }}, '{{ q.resolution }}', {{ q.quality_val }})"
+                                class="quality-item-btn w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer {% if q.is_active %}text-brand-red font-bold bg-brand-red/10{% else %}text-slate-200{% endif %}"
+                                data-movie-id="{{ q.id }}"
+                                data-resolution="{{ q.resolution }}"
+                                data-quality-val="{{ q.quality_val }}">
+                            <div class="flex items-center space-x-2">
+                                <span>{{ q.resolution }}</span>
+                                {% if q.file_size %}
+                                <span class="text-[10px] text-slate-400 font-normal">({{ q.file_size }})</span>
+                                {% endif %}
+                            </div>
+                            <span class="active-check {% if not q.is_active %}hidden{% endif %}">
+                                <i data-lucide="check" class="w-3.5 h-3.5 text-brand-red"></i>
+                            </span>
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
 
         <!-- Video Player Container -->
         <div class="relative bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl">
-            <video id="player" playsinline controls preload="auto" class="w-full aspect-video"
-                   src="/stream/{{ movie.id }}{% if initial_time > 5 %}?ss={{ initial_time|int }}{% endif %}">
-                Your web browser does not support the video tag.
-            </video>
+            <!-- WASM WebCodecs Player (movi-player) -->
+            <div id="wasm-player-container" class="w-full aspect-video">
+                <movi-player id="movi-player"
+                             src=""
+                             controls
+                             playsinline
+                             doubletap
+                             class="w-full h-full block">
+                </movi-player>
+            </div>
+
+            <!-- Native HTML5 Video Player Container (Hidden by default unless switched) -->
+            <div id="native-player-container" class="w-full aspect-video hidden">
+                <video id="player" playsinline controls preload="auto" class="w-full aspect-video">
+                    Your web browser does not support the video tag.
+                </video>
+            </div>
         </div>
 
         <!-- Clean Subtle Shortcuts Guide -->
@@ -118,15 +157,116 @@
 <script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const videoElement = document.getElementById('player');
+        const cfWorkerUrl = "{{ cloudflare_worker_url or '' }}".trim().replace(/\/+$/, '');
+        const gdriveFileId = "{{ movie.gdrive_file_id }}";
+        const googleApiKey = "{{ google_api_key or '' }}".trim();
+        const fileName = "{{ movie.file_name }}";
+        const userToken = "{{ user_token }}";
         const initialPosition = parseFloat("{{ initial_time }}") || 0;
         const totalDuration = parseFloat("{{ (movie.duration or 0) * 60 }}") || 0;
         const qualityVersions = {{ quality_versions|tojson|safe if quality_versions else '[]' }};
         let currentMovieId = parseInt("{{ movie.id }}");
+        let currentGdriveId = gdriveFileId;
+        let currentFileName = fileName;
         let currentOffset = (initialPosition > 5) ? Math.floor(initialPosition) : 0;
         let isSeekingReload = false;
         let isUserSeeking = false;
         let seekDebounceTimer = null;
+        let activeEngine = 'wasm';
+
+        const wasmContainer = document.getElementById('wasm-player-container');
+        const nativeContainer = document.getElementById('native-player-container');
+        const moviPlayer = document.getElementById('movi-player');
+        const videoElement = document.getElementById('player');
+        const btnWasm = document.getElementById('btn-engine-wasm');
+        const btnNative = document.getElementById('btn-engine-native');
+
+        function buildStreamUrl(forEngine, movieIdParam, fileIdParam, fileNameParam, targetSeconds = 0) {
+            if (forEngine === 'wasm') {
+                if (cfWorkerUrl) {
+                    let u = `${cfWorkerUrl}/?file_id=${encodeURIComponent(fileIdParam)}&name=${encodeURIComponent(fileNameParam)}`;
+                    if (googleApiKey) u += `&key=${encodeURIComponent(googleApiKey)}`;
+                    return u;
+                }
+                return `/stream/raw/${movieIdParam}?token=${encodeURIComponent(userToken)}`;
+            } else {
+                let u = `/stream/${movieIdParam}`;
+                const params = [];
+                if (userToken) params.push(`token=${encodeURIComponent(userToken)}`);
+                if (targetSeconds > 5) params.push(`ss=${Math.floor(targetSeconds)}`);
+                if (params.length > 0) u += `?${params.join('&')}`;
+                return u;
+            }
+        }
+
+        // Initialize WASM Player (Default)
+        const initialWasmUrl = buildStreamUrl('wasm', currentMovieId, currentGdriveId, currentFileName);
+        moviPlayer.setAttribute('src', initialWasmUrl);
+
+        if (initialPosition > 5) {
+            moviPlayer.addEventListener('loadedmetadata', () => {
+                moviPlayer.currentTime = initialPosition;
+            }, { once: true });
+        }
+
+        // Progress reporting for WASM player
+        let lastWasmReport = 0;
+        moviPlayer.addEventListener('timeupdate', () => {
+            if (activeEngine !== 'wasm') return;
+            const cur = moviPlayer.currentTime || 0;
+            const dur = totalDuration > 0 ? totalDuration : (moviPlayer.duration || 0);
+            if (Math.abs(cur - lastWasmReport) >= 8) {
+                lastWasmReport = cur;
+                fetch(`/api/movies/${currentMovieId}/progress`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: cur, duration: dur })
+                }).catch(e => {});
+            }
+        });
+
+        moviPlayer.addEventListener('pause', () => {
+            if (activeEngine !== 'wasm') return;
+            const cur = moviPlayer.currentTime || 0;
+            const dur = totalDuration > 0 ? totalDuration : (moviPlayer.duration || 0);
+            fetch(`/api/movies/${currentMovieId}/progress`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ position: cur, duration: dur })
+            }).catch(e => {});
+        });
+
+        window.switchPlayerEngine = function(engine) {
+            if (engine === activeEngine) return;
+            let currentPlayhead = 0;
+            if (activeEngine === 'wasm') {
+                currentPlayhead = moviPlayer.currentTime || 0;
+                try { moviPlayer.pause(); } catch(e){}
+            } else {
+                currentPlayhead = (player && typeof player.currentTime === 'number') ? player.currentTime : (videoElement.currentTime || 0);
+                try { videoElement.pause(); } catch(e){}
+            }
+
+            activeEngine = engine;
+
+            if (engine === 'wasm') {
+                wasmContainer.classList.remove('hidden');
+                nativeContainer.classList.add('hidden');
+                btnWasm.className = "px-2.5 py-1 rounded-lg font-bold transition bg-brand-red text-black shadow-sm";
+                btnNative.className = "px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition";
+                if (currentPlayhead > 0) {
+                    moviPlayer.currentTime = currentPlayhead;
+                }
+            } else {
+                wasmContainer.classList.add('hidden');
+                nativeContainer.classList.remove('hidden');
+                btnNative.className = "px-2.5 py-1 rounded-lg font-bold transition bg-brand-red text-black shadow-sm";
+                btnWasm.className = "px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium transition";
+                if (currentPlayhead > 0) {
+                    seekToTarget(currentPlayhead);
+                }
+            }
+        };
 
         function formatTime(seconds) {
             seconds = Math.max(0, Math.floor(seconds));
@@ -225,7 +365,8 @@
             isSeekingReload = true;
             currentOffset = Math.floor(targetSeconds);
 
-            const newSrc = `/stream/${currentMovieId}?ss=${currentOffset}`;
+            const tokenQuery = userToken ? `&token=${encodeURIComponent(userToken)}` : '';
+            const newSrc = `/stream/${currentMovieId}?ss=${currentOffset}${tokenQuery}`;
             videoElement.src = newSrc;
             videoElement.load();
             videoElement.play().catch(e => {});
@@ -320,14 +461,25 @@
         window.switchQuality = function(targetId, targetResolution, qualityVal) {
             if (targetId === currentMovieId) return;
 
-            const currentTotal = currentOffset + (videoElement.currentTime || 0);
+            const qObj = qualityVersions.find(q => q.id === targetId);
+            if (qObj) {
+                currentFileName = qObj.file_name || currentFileName;
+                currentGdriveId = qObj.gdrive_file_id || currentGdriveId;
+            }
+            const currentTotal = activeEngine === 'wasm' ? (moviPlayer.currentTime || 0) : (currentOffset + (videoElement.currentTime || 0));
             currentMovieId = targetId;
 
             // Update browser URL without reloading page
             window.history.replaceState(null, '', `/watch/${targetId}`);
 
-            // Switch to target resolution at exact current playhead
-            seekToTarget(currentTotal);
+            if (activeEngine === 'wasm') {
+                moviPlayer.setAttribute('src', buildStreamUrl('wasm', targetId, currentGdriveId, currentFileName));
+                moviPlayer.addEventListener('loadedmetadata', () => {
+                    moviPlayer.currentTime = currentTotal;
+                }, { once: true });
+            } else {
+                seekToTarget(currentTotal);
+            }
 
             // Update Top Bar Quality Label
             const labelEl = document.getElementById('current-quality-label');

@@ -13,8 +13,16 @@ class TestFilmsOverWeb(unittest.TestCase):
     def setUpClass(cls):
         Base.metadata.create_all(bind=engine)
         db = SessionLocal()
-        from app.auth import init_default_users
-        init_default_users(db)
+        from app.auth import get_password_hash
+        admin = db.query(User).filter(User.role == "superadmin").first()
+        if admin:
+            admin.email = "test@gmail.com"
+            admin.hashed_password = get_password_hash("1q2w3e4r5t")
+            admin.must_change_password = True
+            db.commit()
+        else:
+            from app.auth import init_default_users
+            init_default_users(db)
         db.close()
         cls.client = TestClient(app)
 
@@ -130,34 +138,39 @@ class TestFilmsOverWeb(unittest.TestCase):
         # Submit change password & email form
         new_email = "myadmin@example.com"
         new_pw = "MySecureAdminPass2026!"
-        change_resp = admin_client.post("/change-password", data={
-            "email": new_email,
-            "current_password": "1q2w3e4r5t",
-            "new_password": new_pw,
-            "confirm_password": new_pw
-        }, follow_redirects=False)
-        self.assertEqual(change_resp.status_code, 302)
-        self.assertIn("/superadmin/settings?setup_complete=1", change_resp.headers.get("location", ""))
+        try:
+            change_resp = admin_client.post("/change-password", data={
+                "email": new_email,
+                "current_password": "1q2w3e4r5t",
+                "new_password": new_pw,
+                "confirm_password": new_pw
+            }, follow_redirects=False)
+            self.assertEqual(change_resp.status_code, 302)
+            self.assertIn("/superadmin/settings?setup_complete=1", change_resp.headers.get("location", ""))
 
-        # Follow to settings
-        settings_resp = admin_client.get("/superadmin/settings?setup_complete=1")
-        self.assertEqual(settings_resp.status_code, 200)
-        self.assertIn(b"SuperAdmin Credentials Updated Successfully", settings_resp.content)
+            # Follow to settings
+            settings_resp = admin_client.get("/superadmin/settings?setup_complete=1")
+            self.assertEqual(settings_resp.status_code, 200)
+            self.assertIn(b"SuperAdmin Credentials Updated Successfully", settings_resp.content)
 
-        # Verify db updated and must_change_password is now False
-        db = SessionLocal()
-        admin_user = db.query(User).filter(User.email == new_email).first()
-        self.assertIsNotNone(admin_user)
-        self.assertEqual(admin_user.role, "superadmin")
-        self.assertFalse(admin_user.must_change_password)
-
-        # Reset back to default test@gmail.com / 1q2w3e4r5t for persistent repeatability
-        from app.auth import get_password_hash
-        admin_user.email = "test@gmail.com"
-        admin_user.hashed_password = get_password_hash("1q2w3e4r5t")
-        admin_user.must_change_password = True
-        db.commit()
-        db.close()
+            # Verify db updated and must_change_password is now False
+            db = SessionLocal()
+            admin_user = db.query(User).filter(User.email == new_email).first()
+            self.assertIsNotNone(admin_user)
+            self.assertEqual(admin_user.role, "superadmin")
+            self.assertFalse(admin_user.must_change_password)
+            db.close()
+        finally:
+            # Reset back to default test@gmail.com / 1q2w3e4r5t for persistent repeatability
+            db = SessionLocal()
+            admin_user = db.query(User).filter(User.role == "superadmin").first()
+            if admin_user:
+                from app.auth import get_password_hash
+                admin_user.email = "test@gmail.com"
+                admin_user.hashed_password = get_password_hash("1q2w3e4r5t")
+                admin_user.must_change_password = True
+                db.commit()
+            db.close()
 
 if __name__ == "__main__":
     unittest.main()

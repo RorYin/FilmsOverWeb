@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from app.database import get_db, Session
 from app.models import User, SystemSetting
+from app.config import settings
 from app.auth import get_current_user, require_role, get_password_hash
 from app.mailer import send_guest_welcome_email, get_smtp_config
 
@@ -34,6 +35,7 @@ async def settings_view(
         "tmdb_api_key": get_setting_val("tmdb_api_key", db, ""),
         "google_api_key": get_setting_val("google_api_key", db, ""),
         "google_service_account_json": get_setting_val("google_service_account_json", db, ""),
+        "cloudflare_worker_url": get_setting_val("cloudflare_worker_url", db, settings.CLOUDFLARE_WORKER_URL),
         "smtp_host": get_setting_val("smtp_host", db, "smtp.gmail.com"),
         "smtp_port": get_setting_val("smtp_port", db, "465"),
         "smtp_user": get_setting_val("smtp_user", db, ""),
@@ -60,9 +62,10 @@ async def save_settings(
     tmdb_api_key: str = Form(""),
     google_api_key: str = Form(""),
     google_service_account_json: str = Form(""),
+    cloudflare_worker_url: str = Form(""),
     smtp_host: str = Form("smtp.gmail.com"),
     smtp_port: str = Form("465"),
-    smtp_user: str = Form("drmnbot@gmail.com"),
+    smtp_user: str = Form(""),
     smtp_password: str = Form(""),
     smtp_use_ssl: str = Form("true"),
     db: Session = Depends(get_db),
@@ -71,6 +74,7 @@ async def save_settings(
     set_setting_val("tmdb_api_key", tmdb_api_key.strip(), db)
     set_setting_val("google_api_key", google_api_key.strip(), db)
     set_setting_val("google_service_account_json", google_service_account_json.strip(), db)
+    set_setting_val("cloudflare_worker_url", cloudflare_worker_url.strip().rstrip("/"), db)
     set_setting_val("smtp_host", smtp_host.strip(), db)
     set_setting_val("smtp_port", smtp_port.strip(), db)
     set_setting_val("smtp_user", smtp_user.strip(), db)
