@@ -55,11 +55,14 @@ def send_guest_welcome_email(
 ) -> Tuple[bool, str]:
     """
     Automates sending the welcome email with credentials to newly created guest accounts
-    using Google Mail (drmnbot@gmail.com).
+    using Google Mail SMTP.
     """
     cfg = get_smtp_config(db)
-    sender = cfg["user"] or "drmnbot@gmail.com"
-    password_smtp = (cfg["password"] or "").strip().replace(" ", "")
+    sender = (cfg.get("user") or "").strip()
+    password_smtp = (cfg.get("password") or "").strip().replace(" ", "")
+
+    if not sender:
+        return False, "Gmail Sender Email is not configured in SuperAdmin Settings yet. Please enter your email address in Settings."
 
     if not password_smtp:
         return False, "Google App Password is not configured in SuperAdmin Settings yet. Please generate one at https://myaccount.google.com/apppasswords and paste it in Settings."
@@ -163,8 +166,11 @@ def send_password_reset_email(
     When they log in, they will be required to change it.
     """
     cfg = get_smtp_config(db)
-    sender = cfg["user"] or "drmnbot@gmail.com"
-    password_smtp = (cfg["password"] or "").strip().replace(" ", "")
+    sender = (cfg.get("user") or "").strip()
+    password_smtp = (cfg.get("password") or "").strip().replace(" ", "")
+
+    if not sender:
+        return False, "Gmail Sender Email is not configured in SuperAdmin Settings yet. Please configure your email in Settings."
 
     if not password_smtp:
         return False, "Google App Password is not configured in SuperAdmin Settings. Please configure it to enable password reset emails."
@@ -249,7 +255,7 @@ If you did not request this, please contact your administrator.
     return _dispatch_smtp_email(user_email, msg, cfg, db)
 
 def _dispatch_smtp_email(to_email: str, msg: MIMEMultipart, cfg: dict, db: Optional[Session] = None) -> Tuple[bool, str]:
-    sender = cfg["user"] or "drmnbot@gmail.com"
+    sender = (cfg.get("user") or "").strip()
     password_smtp = (cfg["password"] or "").strip().replace(" ", "")
 
     def attempt_send(host: str, port: int, use_ssl: bool):

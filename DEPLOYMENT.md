@@ -143,8 +143,8 @@ git push origin main
 5. Under **Advanced → Environment Variables**, add:
    - `SECRET_KEY`: *(Generate a secure random string)*
    - `TMDB_API_KEY`: *(Your TMDB API Key)*
-   - `SUPERADMIN_EMAIL`: `drmnbot@gmail.com`
-   - `SUPERADMIN_PASSWORD`: `YourSecurePassword123!`
+   - `DEFAULT_SUPERADMIN_EMAIL`: `test@gmail.com`
+   - `DEFAULT_SUPERADMIN_PASSWORD`: `1q2w3e4r5t`
 6. Click **Create Web Service**.
 
 Render will automatically build the Docker image, install `ffmpeg`, install Python requirements, and launch Uvicorn. Your Cinema OTT will be live with full 4K streaming and audio transmuxing!
@@ -210,4 +210,4 @@ sudo systemctl enable --now filmsoverweb
 - [ ] **Configure SuperAdmin**: Change default admin credentials upon first login.
 - [ ] **Google Drive Credentials**: Add your Google Service Account JSON or API Key in `/superadmin/settings`.
 - [ ] **TMDB API Key**: Enter your free 32-character API key in `/superadmin/settings` to automate poster and backdrop fetching.
-- [ ] **Gmail SMTP**: Configure `drmnbot@gmail.com` with a Google App Password to enable automated guest welcome emails and password resets.
+- [ ] **Gmail SMTP**: Configure your Gmail address and Google App Password in `/superadmin/settings` to enable automated guest welcome emails and password resets.

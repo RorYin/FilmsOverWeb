@@ -2,12 +2,12 @@
   "users": [
     {
       "id": 2,
-      "email": "drmnbot@gmail.com",
+      "email": "test@gmail.com",
       "name": "Super Administrator",
-      "hashed_password": "$2b$12$ZaEvnGNRSF2NIFNX2/bGm.jermXVh2kp8hAEh8sohupv2me9KtvQ.",
+      "hashed_password": "$2b$12$xhYoElvj6c7jeKz4QtCzueapp3JEalOTtaWm0EXa.hgNwJ3i5wQUG",
       "role": "superadmin",
       "is_active": 1,
-      "must_change_password": 0,
+      "must_change_password": true,
       "created_at": "2026-10-15T17:43:44.911946"
     },
     {
@@ -17,7 +17,7 @@
       "hashed_password": "$2b$12$3CI7mRUzTTunDrt58L9kVeqNye6QbvBiVnXkwdd6vC.GCcwX8.OtW",
       "role": "guest",
       "is_active": 1,
-      "must_change_password": 0,
+      "must_change_password": false,
       "created_at": "2026-10-15T20:02:34.376541"
     }
   ],
@@ -194,9 +194,9 @@
       "id": 1,
       "user_id": 2,
       "movie_id": 7,
-      "position_seconds": 3068.161545,
+      "position_seconds": 3069.449065,
       "duration_seconds": 7980.0,
-      "completed": 0,
+      "completed": false,
       "updated_at": "2026-10-15T20:03:50.045243"
     },
     {

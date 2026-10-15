@@ -2,7 +2,7 @@
 
 **FilmsOverWeb** is a high-performance, private OTT streaming platform built with **FastAPI** that aggregates movies from your Google Drive folders and displays them in a sleek, modern **Netflix / Prime Video** style interface.
 
-It features **lossless direct video playback** with native in-browser **HEVC (H.265)** and **AV1** hardware decoding, automatic **TMDB metadata enrichment**, and **Google Mail automation** (`drmnbot@gmail.com`) for guest onboarding.
+It features **lossless direct video playback** with native in-browser **HEVC (H.265)** and **AV1** hardware decoding, automatic **TMDB metadata enrichment**, and **Google Mail automation** for guest onboarding and password recovery.
 
 ---
 
@@ -36,7 +36,7 @@ It features **lossless direct video playback** with native in-browser **HEVC (H.
 
 - **✉️ Automated Guest Onboarding via Google Mail**:
   - Creating a guest generates a secure, randomized 12-character password.
-  - Automatically sends a branded HTML welcome email with credentials and direct login URL from `drmnbot@gmail.com`.
+  - Automatically sends a branded HTML welcome email with credentials and direct login URL from your configured Gmail address.
   - Fallback "Copy Credentials" button ensures onboarding is never blocked if SMTP credentials are still being configured.
 
 ---
@@ -53,7 +53,7 @@ FilmsOverWeb/
 │   ├── parser.py                 # Filename parser for titles, years, codecs & resolution
 │   ├── gdrive.py                 # Google Drive API & Range-based stream generator
 │   ├── tmdb.py                   # TMDB API client with search & details enrichment
-│   ├── mailer.py                 # Gmail automation using drmnbot@gmail.com
+│   ├── mailer.py                 # Gmail automation for guest invites and password resets
 │   ├── routes/
 │   │   ├── auth_routes.py        # Login, logout, session management
 │   │   ├── movie_routes.py       # OTT homepage, catalog, movie details, watch view
@@ -84,10 +84,11 @@ The application will start on: **`http://127.0.0.1:8000`**
 
 ### 2. Default Login Credentials
 - **Role**: SuperAdmin
-- **Email**: `drmnbot@gmail.com`
-- **Password**: `SuperAdmin@2026`
+- **Email**: `test@gmail.com`
+- **Password**: `1q2w3e4r5t`
 
-*(You can change the password or create new admins in the SuperAdmin panel)*
+> [!IMPORTANT]
+> **First-Time Setup Prompt**: Upon your first login as SuperAdmin, you will immediately be prompted to change both your **email address** and **password**. Once updated, you will be redirected to the SuperAdmin Settings to configure your TMDB API Key, Google Drive storage, and Gmail SMTP.
 
 ---
 
@@ -104,8 +105,8 @@ Log in as SuperAdmin and navigate to **Settings** (`/superadmin/settings`):
 - **Public Shared Folders**: Set folder sharing to *"Anyone with the link can view"* and enter your Google API Key.
 - **Private / Team Folders**: Paste your Google Cloud Service Account JSON key into the Service Account box, and share the Google Drive folder with the Service Account email (`xxx@xxx.iam.gserviceaccount.com`).
 
-### 3. Google Mail Automation (drmnbot@gmail.com)
-- **Sender**: `drmnbot@gmail.com`
+### 3. Google Mail Automation (Gmail SMTP)
+- **Sender**: Your Gmail address (configured in Settings)
 - **SMTP Host**: `smtp.gmail.com`
 - **SMTP Port**: `465` (SSL)
 - **Google App Password**: 

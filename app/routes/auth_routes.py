@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -90,6 +91,7 @@ async def change_password_action(
     current_password: str = Form(...),
     new_password: str = Form(...),
     confirm_password: str = Form(...),
+    email: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     user = get_current_user_optional(request, db)
@@ -108,6 +110,36 @@ async def change_password_action(
             },
             status_code=400
         )
+
+    # Validate and handle email update if supplied
+    clean_email = None
+    if email is not None:
+        clean_email = email.strip().lower()
+        if not clean_email or "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+            return templates.TemplateResponse(
+                request=request,
+                name="change_password.html",
+                context={
+                    "user": user,
+                    "is_first_time": user.must_change_password,
+                    "error": "Please enter a valid email address."
+                },
+                status_code=400
+            )
+        # Check if email is already taken by another user
+        if clean_email != user.email:
+            conflict = db.query(User).filter(User.email == clean_email, User.id != user.id).first()
+            if conflict:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="change_password.html",
+                    context={
+                        "user": user,
+                        "is_first_time": user.must_change_password,
+                        "error": f"The email '{clean_email}' is already in use by another account."
+                    },
+                    status_code=400
+                )
 
     # Validate new password match
     if new_password != confirm_password:
@@ -148,13 +180,34 @@ async def change_password_action(
             status_code=400
         )
 
+    # Apply email change if provided and different
+    if clean_email and clean_email != user.email:
+        user.email = clean_email
+
     # Apply new password and clear first-time change flag
     user.hashed_password = get_password_hash(new_password)
     user.must_change_password = False
     db.commit()
 
-    # Redirect to home with notification
-    return RedirectResponse(url="/?password_changed=1", status_code=status.HTTP_302_FOUND)
+    # Re-issue auth token with updated email address
+    new_token = create_access_token({"sub": user.email, "role": user.role})
+
+    # SuperAdmin is guided directly to settings to configure TMDB, GDrive, and SMTP
+    if user.role == "superadmin":
+        target_url = "/superadmin/settings?setup_complete=1"
+    else:
+        target_url = "/?password_changed=1"
+
+    response = RedirectResponse(url=target_url, status_code=status.HTTP_302_FOUND)
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=new_token,
+        httponly=True,
+        max_age=60 * 60 * 24 * 7,
+        samesite="lax",
+        secure=False
+    )
+    return response
 
 @router.get("/forgot-password", response_class=HTMLResponse)
 async def forgot_password_page(request: Request):

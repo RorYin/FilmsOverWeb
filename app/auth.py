@@ -96,13 +96,23 @@ def require_role(roles: list[str]):
     return role_checker
 
 def init_default_users(db: Session):
-    """Ensure at least one superadmin exists."""
+    """Ensure at least one superadmin exists with the configured default credentials."""
+    # Check if legacy default superadmin exists and migrate to new credentials
+    old_default = db.query(User).filter(User.email == "drmnbot@gmail.com").first()
+    if old_default:
+        old_default.email = settings.DEFAULT_SUPERADMIN_EMAIL
+        old_default.hashed_password = get_password_hash(settings.DEFAULT_SUPERADMIN_PASSWORD)
+        old_default.must_change_password = True
+        db.commit()
+        print(f"[AUTH] Migrated legacy default SuperAdmin to ({settings.DEFAULT_SUPERADMIN_EMAIL} / {settings.DEFAULT_SUPERADMIN_PASSWORD}) with must_change_password=True")
+
     existing_superadmin = db.query(User).filter(User.role == "superadmin").first()
     if not existing_superadmin:
         email = settings.DEFAULT_SUPERADMIN_EMAIL
         existing_user = db.query(User).filter(User.email == email).first()
         if existing_user:
             existing_user.role = "superadmin"
+            existing_user.must_change_password = True
             db.commit()
             print(f"[AUTH] Promoted existing user {email} to SuperAdmin.")
         else:
@@ -111,8 +121,9 @@ def init_default_users(db: Session):
                 name="Super Administrator",
                 hashed_password=get_password_hash(settings.DEFAULT_SUPERADMIN_PASSWORD),
                 role="superadmin",
+                must_change_password=True,
                 is_active=True
             )
             db.add(default_admin)
             db.commit()
-            print(f"[AUTH] Created default SuperAdmin ({email} / {settings.DEFAULT_SUPERADMIN_PASSWORD})")
+            print(f"[AUTH] Created default SuperAdmin ({email} / {settings.DEFAULT_SUPERADMIN_PASSWORD}) with must_change_password=True")

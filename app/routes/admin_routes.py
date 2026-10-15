@@ -253,7 +253,7 @@ async def create_guest(
     base_url = str(request.base_url).rstrip("/")
     login_url = f"{base_url}/login"
 
-    # Send Welcome Email using Google Mail automation (drmnbot@gmail.com)
+    # Send Welcome Email using Google Mail automation
     mail_ok, mail_msg = send_guest_welcome_email(
         guest_email=clean_email,
         guest_name=new_guest.name,

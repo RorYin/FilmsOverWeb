@@ -215,6 +215,8 @@ class JsonDatabase:
                 return
 
             try:
+                mtime = os.path.getmtime(self.filepath)
+                self._last_mtime = mtime
                 with open(self.filepath, "r", encoding="utf-8") as f:
                     raw_data = json.load(f)
                 for table_name, rows in raw_data.items():
@@ -264,9 +266,20 @@ class JsonDatabase:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
             os.replace(tmp_path, self.filepath)
+            try:
+                self._last_mtime = os.path.getmtime(self.filepath)
+            except Exception:
+                pass
 
     def get_collection(self, model_cls):
         with self.lock:
+            try:
+                if os.path.exists(self.filepath):
+                    mtime = os.path.getmtime(self.filepath)
+                    if not hasattr(self, "_last_mtime") or mtime > self._last_mtime:
+                        self.load()
+            except Exception:
+                pass
             table_name = getattr(model_cls, "__tablename__", model_cls.__name__.lower() + "s")
             if table_name not in self.collections:
                 self.collections[table_name] = []

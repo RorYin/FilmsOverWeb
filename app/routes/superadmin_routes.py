@@ -36,7 +36,7 @@ async def settings_view(
         "google_service_account_json": get_setting_val("google_service_account_json", db, ""),
         "smtp_host": get_setting_val("smtp_host", db, "smtp.gmail.com"),
         "smtp_port": get_setting_val("smtp_port", db, "465"),
-        "smtp_user": get_setting_val("smtp_user", db, "drmnbot@gmail.com"),
+        "smtp_user": get_setting_val("smtp_user", db, ""),
         "smtp_password": get_setting_val("smtp_password", db, ""),
         "smtp_use_ssl": get_setting_val("smtp_use_ssl", db, "true")
     }
@@ -46,6 +46,7 @@ async def settings_view(
         context={
             "user": user,
             "settings": current_settings,
+            "setup_complete": request.query_params.get("setup_complete") == "1",
             "success": request.query_params.get("saved") == "1",
             "enriched": request.query_params.get("enriched") == "1",
             "test_result": None

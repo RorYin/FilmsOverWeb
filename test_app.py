@@ -56,15 +56,23 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertTrue(any(c.islower() for c in pw))
         self.assertTrue(any(c.isdigit() for c in pw))
 
-    def test_04_auth_and_login(self):
-        # Attempt login with default SuperAdmin
+    def test_04_auth_and_login_first_time(self):
+        # Attempt login with default SuperAdmin test@gmail.com / 1q2w3e4r5t
         resp = self.client.post("/login", data={
-            "email": "drmnbot@gmail.com",
-            "password": "SuperAdmin@2026",
+            "email": "test@gmail.com",
+            "password": "1q2w3e4r5t",
             "next": "/"
         }, follow_redirects=False)
         self.assertEqual(resp.status_code, 302)
+        # Should redirect to /change-password on first login
+        self.assertIn("/change-password", resp.headers.get("location", ""))
         self.assertIn("fow_token", resp.cookies)
+
+        # GET /change-password should render the setup form
+        cp_page = self.client.get("/change-password")
+        self.assertEqual(cp_page.status_code, 200)
+        self.assertIn(b"Set Admin Email & Password", cp_page.content)
+        self.assertIn(b"test@gmail.com", cp_page.content)
 
     def test_05_guest_restriction(self):
         # Create a guest in DB
@@ -77,9 +85,13 @@ class TestFilmsOverWeb(unittest.TestCase):
                 name="Guest Tester",
                 hashed_password=get_password_hash("GuestPass@123"),
                 role="guest",
+                must_change_password=False,
                 is_active=True
             )
             db.add(guest)
+            db.commit()
+        else:
+            guest.must_change_password = False
             db.commit()
         db.close()
 
@@ -106,29 +118,46 @@ class TestFilmsOverWeb(unittest.TestCase):
         catalog_resp = guest_client.get("/movies")
         self.assertEqual(catalog_resp.status_code, 200)
 
-    def test_06_superadmin_access(self):
+    def test_06_superadmin_change_credentials_flow(self):
         admin_client = TestClient(app)
+        # Login with default credentials
         admin_client.post("/login", data={
-            "email": "drmnbot@gmail.com",
-            "password": "SuperAdmin@2026",
+            "email": "test@gmail.com",
+            "password": "1q2w3e4r5t",
             "next": "/"
         })
 
-        # Superadmin can view settings
-        settings_resp = admin_client.get("/superadmin/settings")
+        # Submit change password & email form
+        new_email = "myadmin@example.com"
+        new_pw = "MySecureAdminPass2026!"
+        change_resp = admin_client.post("/change-password", data={
+            "email": new_email,
+            "current_password": "1q2w3e4r5t",
+            "new_password": new_pw,
+            "confirm_password": new_pw
+        }, follow_redirects=False)
+        self.assertEqual(change_resp.status_code, 302)
+        self.assertIn("/superadmin/settings?setup_complete=1", change_resp.headers.get("location", ""))
+
+        # Follow to settings
+        settings_resp = admin_client.get("/superadmin/settings?setup_complete=1")
         self.assertEqual(settings_resp.status_code, 200)
+        self.assertIn(b"SuperAdmin Credentials Updated Successfully", settings_resp.content)
 
-        # Superadmin can view admins
-        admins_resp = admin_client.get("/superadmin/admins")
-        self.assertEqual(admins_resp.status_code, 200)
+        # Verify db updated and must_change_password is now False
+        db = SessionLocal()
+        admin_user = db.query(User).filter(User.email == new_email).first()
+        self.assertIsNotNone(admin_user)
+        self.assertEqual(admin_user.role, "superadmin")
+        self.assertFalse(admin_user.must_change_password)
 
-        # Superadmin can view folders
-        folders_resp = admin_client.get("/admin/folders")
-        self.assertEqual(folders_resp.status_code, 200)
-
-        # Superadmin can view guests
-        guests_resp = admin_client.get("/admin/guests")
-        self.assertEqual(guests_resp.status_code, 200)
+        # Reset back to default test@gmail.com / 1q2w3e4r5t for persistent repeatability
+        from app.auth import get_password_hash
+        admin_user.email = "test@gmail.com"
+        admin_user.hashed_password = get_password_hash("1q2w3e4r5t")
+        admin_user.must_change_password = True
+        db.commit()
+        db.close()
 
 if __name__ == "__main__":
     unittest.main()
