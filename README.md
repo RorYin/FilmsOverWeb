@@ -140,6 +140,17 @@ Log in as SuperAdmin and navigate to **Settings** (`/superadmin/settings`):
 
 ---
 
+## 🌐 Deployment & Hosting
+
+For complete step-by-step guides on deploying FilmsOverWeb to cloud platforms, read the [Deployment Guide](DEPLOYMENT.md).
+
+- **Render.com (Recommended Free Cloud Deployment)**: Native ASGI, includes `ffmpeg` via Docker, supports long video streaming sessions and 100% free tier.
+- **PythonAnywhere (Free Tier)**: Supported via the included WSGI adapter ([`wsgi.py`](wsgi.py)), but has free tier limitations (1 worker, no ffmpeg, outbound whitelist).
+- **Vercel**: ❌ **Not recommended / Incompatible** due to serverless 10-second request timeouts and 4.5 MB payload caps.
+- **Self-Hosted VPS / Docker**: 🏆 Best performance with dedicated CPU for unlimited 4K lossless streaming via `docker compose up -d`.
+
+---
+
 ## 🧪 Testing
 
 Run the included automated test suite anytime:

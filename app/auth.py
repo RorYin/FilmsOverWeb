@@ -39,6 +39,10 @@ def get_token_from_request(request: Request) -> Optional[str]:
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         return auth_header.split(" ")[1]
+    # Check query parameter (e.g. for VLC, external player, or media streams)
+    query_token = request.query_params.get("token")
+    if query_token:
+        return query_token
     # Check HTTP-only cookie
     return request.cookies.get(COOKIE_NAME)
 
@@ -69,6 +73,17 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Enforce password change for users flagged with must_change_password
+    path = request.url.path
+    if user.must_change_password and not path.startswith("/change-password") and not path.startswith("/logout") and not path.startswith("/static"):
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept or request.method == "GET":
+            raise HTTPException(
+                status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+                headers={"Location": "/change-password"}
+            )
+
     return user
 
 def require_role(roles: list[str]):

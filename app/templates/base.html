@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}FilmsOverWeb - Cloud Cinema OTT{% endblock %}</title>
+    <!-- Favicon matching top brand logo -->
+    <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
+    <link rel="alternate icon" href="/static/img/favicon.ico">
+    <link rel="apple-touch-icon" href="/static/img/favicon.svg">
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -13,8 +17,12 @@
                 extend: {
                     colors: {
                         brand: {
-                            red: '#e50914',
-                            redHover: '#b20710',
+                            red: '#e5a00d',         /* Warm cinematic golden-yellow */
+                            redHover: '#c78707',
+                            yellow: '#e5a00d',
+                            yellowHover: '#c78707',
+                            accent: '#e5a00d',
+                            accentHover: '#c78707',
                             blue: '#00a8e1',
                             dark: '#0b0c0e',
                             surface: '#14171f',
@@ -31,49 +39,30 @@
     <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}{% endblock %}
 </head>
-<body class="bg-brand-dark text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-brand-red selection:text-white">
+<body class="bg-brand-dark text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-black">
 
     <!-- Top Navigation Bar -->
     <nav class="sticky top-0 z-50 bg-[#0b0c0e]/90 backdrop-blur-md border-b border-brand-border/60 transition-all duration-300">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-16">
                 <!-- Brand / Logo -->
                 <div class="flex items-center space-x-8">
                     <a href="/" class="flex items-center space-x-2 text-2xl font-black tracking-wider group">
                         <span class="p-1.5 bg-brand-red rounded-lg group-hover:scale-105 transition-transform duration-200">
-                            <i data-lucide="clapperboard" class="w-6 h-6 text-white"></i>
+                            <i data-lucide="clapperboard" class="w-6 h-6 text-black"></i>
                         </span>
                         <span class="text-white">FILMS<span class="text-brand-red">OVER</span>WEB</span>
                     </a>
                     
-                    <!-- Main Navigation Links -->
+                    <!-- Main Navigation Links: Only Library & Recently Added -->
                     {% if user %}
-                    <div class="hidden md:flex items-center space-x-1 text-sm font-medium">
-                        <a href="/" class="px-3 py-2 rounded-md hover:text-brand-red hover:bg-brand-surface transition {% if request.url.path == '/' %}text-brand-red bg-brand-surface{% else %}text-slate-300{% endif %}">Home</a>
-                        <a href="/movies" class="px-3 py-2 rounded-md hover:text-brand-red hover:bg-brand-surface transition {% if request.url.path == '/movies' %}text-brand-red bg-brand-surface{% else %}text-slate-300{% endif %}">Movies</a>
-
-                        {% if user.role in ['admin', 'superadmin'] %}
-                        <div class="h-4 w-px bg-slate-700 mx-2"></div>
-                        <a href="/admin/folders" class="px-3 py-2 rounded-md hover:text-brand-blue hover:bg-brand-surface transition {% if '/admin/folders' in request.url.path %}text-brand-blue bg-brand-surface{% else %}text-slate-300{% endif %} flex items-center space-x-1">
-                            <i data-lucide="folder-git-2" class="w-4 h-4"></i>
-                            <span>Drive Folders</span>
+                    <div class="hidden md:flex items-center space-x-2 text-sm font-medium">
+                        <a href="/movies" class="px-3.5 py-1.5 rounded-xl transition {% if request.url.path == '/movies' and not request.query_params.get('sort') %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
+                            Library
                         </a>
-                        <a href="/admin/guests" class="px-3 py-2 rounded-md hover:text-brand-blue hover:bg-brand-surface transition {% if '/admin/guests' in request.url.path %}text-brand-blue bg-brand-surface{% else %}text-slate-300{% endif %} flex items-center space-x-1">
-                            <i data-lucide="users" class="w-4 h-4"></i>
-                            <span>Guests</span>
+                        <a href="/movies?sort=newest" class="px-3.5 py-1.5 rounded-xl transition {% if request.query_params.get('sort') == 'newest' %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
+                            Recently Added
                         </a>
-                        {% endif %}
-
-                        {% if user.role == 'superadmin' %}
-                        <a href="/superadmin/settings" class="px-3 py-2 rounded-md hover:text-amber-400 hover:bg-brand-surface transition {% if '/superadmin/settings' in request.url.path %}text-amber-400 bg-brand-surface{% else %}text-slate-300{% endif %} flex items-center space-x-1">
-                            <i data-lucide="settings" class="w-4 h-4"></i>
-                            <span>Settings</span>
-                        </a>
-                        <a href="/superadmin/admins" class="px-3 py-2 rounded-md hover:text-amber-400 hover:bg-brand-surface transition {% if '/superadmin/admins' in request.url.path %}text-amber-400 bg-brand-surface{% else %}text-slate-300{% endif %} flex items-center space-x-1">
-                            <i data-lucide="shield-check" class="w-4 h-4"></i>
-                            <span>Admins</span>
-                        </a>
-                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
@@ -87,10 +76,10 @@
                         <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
                     </form>
 
-                    <!-- User Profile Pill -->
+                    <!-- User Profile Pill & Comprehensive Management Dropdown -->
                     <div class="relative group">
-                        <button class="flex items-center space-x-2 bg-brand-surface border border-brand-border px-3 py-1.5 rounded-full hover:border-slate-500 transition">
-                            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-brand-red to-rose-400 flex items-center justify-center font-bold text-xs text-white uppercase">
+                        <button class="flex items-center space-x-2 bg-brand-surface border border-brand-border px-3 py-1.5 rounded-full hover:border-slate-500 transition cursor-pointer">
+                            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center font-black text-xs text-black uppercase shadow-sm">
                                 {{ user.name[:1] if user.name else user.email[:1] }}
                             </div>
                             <span class="text-xs font-semibold hidden md:inline text-slate-200">{{ user.name or user.email.split('@')[0] }}</span>
@@ -100,31 +89,61 @@
                             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
                         </button>
                         
-                        <!-- Dropdown Menu -->
-                        <div class="absolute right-0 mt-2 w-48 bg-brand-surface border border-brand-border rounded-xl shadow-2xl py-2 hidden group-hover:block transition-all z-50">
+                        <!-- Dropdown Menu with Home, Library, and Admin Options -->
+                        <div class="absolute right-0 mt-2 w-56 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl py-2 hidden group-hover:block transition-all z-50 backdrop-blur-xl">
                             <div class="px-4 py-2 border-b border-brand-border text-xs text-slate-400">
                                 Signed in as<br>
                                 <span class="font-medium text-slate-200 truncate block">{{ user.email }}</span>
                             </div>
-                            <a href="/movies" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2">
-                                <i data-lucide="film" class="w-4 h-4"></i>
-                                <span>Browse Catalog</span>
-                            </a>
+
+                            <div class="py-1">
+                                <a href="/" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                    <i data-lucide="home" class="w-4 h-4 text-slate-400"></i>
+                                    <span>Home</span>
+                                </a>
+                                <a href="/movies" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                    <i data-lucide="film" class="w-4 h-4 text-slate-400"></i>
+                                    <span>Browse Library</span>
+                                </a>
+                            </div>
+
                             {% if user.role in ['admin', 'superadmin'] %}
-                            <a href="/admin/folders" class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2">
-                                <i data-lucide="folder-plus" class="w-4 h-4"></i>
-                                <span>Add Google Drive</span>
+                            <div class="border-t border-brand-border/60 my-1"></div>
+                            <div class="px-4 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Administration</div>
+                            <a href="/admin/folders" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                <i data-lucide="folder-git-2" class="w-4 h-4 text-brand-blue"></i>
+                                <span>Drive Folders</span>
+                            </a>
+                            <a href="/admin/guests" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                <i data-lucide="users" class="w-4 h-4 text-emerald-400"></i>
+                                <span>Guest Users</span>
                             </a>
                             {% endif %}
-                            <div class="border-t border-brand-border my-1"></div>
-                            <a href="/logout" class="block px-4 py-2 text-sm text-rose-400 hover:bg-rose-500/10 flex items-center space-x-2">
+
+                            {% if user.role == 'superadmin' %}
+                            <a href="/superadmin/settings" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                <i data-lucide="settings" class="w-4 h-4 text-amber-400"></i>
+                                <span>System Settings</span>
+                            </a>
+                            <a href="/superadmin/admins" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                <i data-lucide="shield-check" class="w-4 h-4 text-amber-400"></i>
+                                <span>Admin Management</span>
+                            </a>
+                            {% endif %}
+
+                            <div class="border-t border-brand-border/60 my-1"></div>
+                            <a href="/change-password" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                <i data-lucide="key" class="w-4 h-4 text-amber-400"></i>
+                                <span>Change Password</span>
+                            </a>
+                            <a href="/logout" class="px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10 flex items-center space-x-2.5 transition">
                                 <i data-lucide="log-out" class="w-4 h-4"></i>
                                 <span>Sign Out</span>
                             </a>
                         </div>
                     </div>
                     {% else %}
-                    <a href="/login" class="bg-brand-red hover:bg-brand-redHover text-white px-5 py-2 rounded-md font-semibold text-sm transition">Sign In</a>
+                    <a href="/login" class="bg-brand-red hover:bg-brand-redHover text-black px-5 py-2 rounded-xl font-bold text-sm shadow-md transition">Sign In</a>
                     {% endif %}
                 </div>
             </div>

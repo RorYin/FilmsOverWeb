@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, Form, HTTPException, status
+from fastapi import APIRouter, Request, Depends, Form, HTTPException, BackgroundTasks, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -48,6 +48,7 @@ async def settings_view(
             "user": user,
             "settings": current_settings,
             "success": request.query_params.get("saved") == "1",
+            "enriched": request.query_params.get("enriched") == "1",
             "test_result": None
         }
     )
@@ -55,6 +56,7 @@ async def settings_view(
 @router.post("/settings/save")
 async def save_settings(
     request: Request,
+    background_tasks: BackgroundTasks,
     tmdb_api_key: str = Form(""),
     google_api_key: str = Form(""),
     google_service_account_json: str = Form(""),
@@ -72,10 +74,26 @@ async def save_settings(
     set_setting_val("smtp_host", smtp_host.strip(), db)
     set_setting_val("smtp_port", smtp_port.strip(), db)
     set_setting_val("smtp_user", smtp_user.strip(), db)
-    set_setting_val("smtp_password", smtp_password.strip(), db)
+    set_setting_val("smtp_password", smtp_password.strip().replace(" ", ""), db)
     set_setting_val("smtp_use_ssl", "true" if smtp_use_ssl in ("true", "on", "1") else "false", db)
 
+    # Automatically trigger enrichment for any movies missing TMDB data in background
+    if tmdb_api_key.strip():
+        from app.database import SessionLocal
+        from app.tmdb import enrich_all_missing_movies
+        background_tasks.add_task(enrich_all_missing_movies, SessionLocal)
+
     return RedirectResponse(url="/superadmin/settings?saved=1", status_code=status.HTTP_302_FOUND)
+
+@router.post("/settings/enrich-tmdb")
+async def trigger_enrich_tmdb(
+    background_tasks: BackgroundTasks,
+    user: User = Depends(superadmin_only)
+):
+    from app.database import SessionLocal
+    from app.tmdb import enrich_all_missing_movies
+    background_tasks.add_task(enrich_all_missing_movies, SessionLocal)
+    return RedirectResponse(url="/superadmin/settings?enriched=1", status_code=status.HTTP_302_FOUND)
 
 @router.post("/settings/test-email")
 async def test_email(

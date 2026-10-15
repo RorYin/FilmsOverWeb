@@ -7,87 +7,101 @@
 <link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
 <style>
     :root {
-        --plyr-color-main: #e50914;
+        --plyr-color-main: #e5a00d;
         --plyr-video-background: #000000;
         --plyr-control-radius: 8px;
     }
     .plyr--video {
-        border-radius: 12px;
+        border-radius: 14px;
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9);
     }
     .cinema-backdrop {
         background: radial-gradient(circle at center, #181d28 0%, #08090b 85%);
     }
+    /* Fullscreen auto-hide styling */
+    .plyr--fullscreen-active.autohide-controls {
+        cursor: none !important;
+    }
+    .plyr--fullscreen-active.autohide-controls .plyr__controls,
+    .plyr--fullscreen-active.autohide-controls .plyr__caption {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: translateY(14px);
+        transition: opacity 0.4s ease, transform 0.4s ease !important;
+    }
+    .plyr--fullscreen-active .plyr__controls {
+        transition: opacity 0.25s ease, transform 0.25s ease !important;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="cinema-backdrop min-h-[90vh] py-6 sm:py-10">
-    <div class="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 space-y-5">
+<div class="cinema-backdrop min-h-[90vh] py-6 sm:py-8">
+    <div class="w-[90%] max-w-[1850px] mx-auto px-3 sm:px-6 lg:px-8 space-y-4">
         
-        <!-- Top Cinema Navigation & Status -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-brand-surface/80 border border-brand-border px-4 py-3 rounded-xl backdrop-blur">
+        <!-- Clean Cinema Navigation -->
+        <div class="flex items-center justify-between bg-brand-surface/80 border border-brand-border px-4 py-3 rounded-2xl backdrop-blur shadow-md">
             <div class="flex items-center space-x-3">
-                <a href="/movie/{{ movie.id }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg transition" title="Back to Movie Details">
+                <a href="/movie/{{ movie.id }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl transition" title="Back to Movie Details">
                     <i data-lucide="arrow-left" class="w-5 h-5"></i>
                 </a>
                 <div>
                     <h1 class="text-base sm:text-lg font-bold text-white flex items-center space-x-2">
                         <span>{{ movie.title }}</span>
+                        {% if movie.year %}
                         <span class="text-xs font-normal text-slate-400">({{ movie.year }})</span>
+                        {% endif %}
                     </h1>
-                    <p class="text-[11px] text-slate-400 font-mono truncate max-w-sm sm:max-w-md">
-                        {{ movie.file_name }}
-                    </p>
                 </div>
             </div>
 
-            <!-- Codec and Stream Badges -->
-            <div class="flex flex-wrap items-center gap-2">
-                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-md font-semibold flex items-center space-x-1.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Direct Lossless Stream</span>
-                </span>
-                
-                <span id="codec-live-badge" class="bg-brand-surface border border-brand-border text-xs px-2.5 py-1 rounded-md font-bold text-slate-300">
-                    Codec: {{ movie.codec }}
-                </span>
+            <!-- Quality Option While Playing (if multiple resolutions available in Google Drive) -->
+            {% if quality_versions and quality_versions|length > 1 %}
+            <div class="relative" id="quality-selector-wrapper">
+                <button id="quality-btn" type="button" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm cursor-pointer" title="Select Stream Quality">
+                    <i data-lucide="layers" class="w-4 h-4 text-brand-red"></i>
+                    <span id="current-quality-label">{{ movie.resolution }}</span>
+                    <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+                </button>
 
-                <span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-md font-bold">
-                    {{ movie.resolution }}
-                </span>
+                <!-- Quality Dropdown Menu -->
+                <div id="quality-dropdown" class="hidden absolute right-0 mt-2 w-60 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl py-2 z-50 backdrop-blur-xl">
+                    <div class="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 mb-1">
+                        Select Stream Quality
+                    </div>
+                    {% for q in quality_versions %}
+                    <button type="button"
+                            onclick="switchQuality({{ q.id }}, '{{ q.resolution }}', {{ q.quality_val }})"
+                            class="quality-item-btn w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer {% if q.is_active %}text-brand-red font-bold bg-brand-red/10{% else %}text-slate-200{% endif %}"
+                            data-movie-id="{{ q.id }}"
+                            data-resolution="{{ q.resolution }}"
+                            data-quality-val="{{ q.quality_val }}">
+                        <div class="flex items-center space-x-2">
+                            <span>{{ q.resolution }}</span>
+                            {% if q.file_size %}
+                            <span class="text-[10px] text-slate-400 font-normal">({{ q.file_size }})</span>
+                            {% endif %}
+                        </div>
+                        <span class="active-check {% if not q.is_active %}hidden{% endif %}">
+                            <i data-lucide="check" class="w-3.5 h-3.5 text-brand-red"></i>
+                        </span>
+                    </button>
+                    {% endfor %}
+                </div>
             </div>
+            {% endif %}
         </div>
 
         <!-- Video Player Container -->
         <div class="relative bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl">
-            <video id="player" playsinline controls preload="auto" class="w-full aspect-video">
-                <source src="/stream/{{ movie.id }}" type="{{ movie.mime_type or 'video/mp4' }}">
+            <video id="player" playsinline controls preload="auto" class="w-full aspect-video"
+                   src="/stream/{{ movie.id }}{% if initial_time > 5 %}?ss={{ initial_time|int }}{% endif %}">
                 Your web browser does not support the video tag.
             </video>
         </div>
 
-        <!-- Codec Diagnostics & Hardware Acceleration Helper -->
-        <div id="codec-info-panel" class="bg-brand-surface/60 border border-brand-border rounded-xl p-4 text-xs space-y-2">
-            <div class="flex items-center justify-between">
-                <div class="font-bold text-slate-200 flex items-center space-x-2">
-                    <i data-lucide="cpu" class="w-4 h-4 text-brand-blue"></i>
-                    <span>Hardware Decoder & Codec Support Check</span>
-                </div>
-                <div id="hevc-check-status" class="text-slate-400">
-                    Checking browser codec engine...
-                </div>
-            </div>
-            <p class="text-slate-400 leading-relaxed">
-                FilmsOverWeb streams the raw byte stream directly from Google Drive using HTTP Range Requests (lossless original quality). For HEVC (H.265) and AV1, your browser uses native hardware GPU decoding without lossy server re-encoding.
-            </p>
-            <div id="hevc-hint" class="hidden p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300">
-                💡 <strong>Notice for HEVC playback on Windows browsers:</strong> If playback shows a black screen with audio, ensure Windows has the <em>HEVC Video Extensions</em> installed or enable hardware acceleration under your browser settings (e.g. Edge and Chrome natively support HEVC when GPU decoding is active).
-            </div>
-        </div>
-
-        <!-- Quick Keyboard Shortcuts Guide -->
-        <div class="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-500 pt-2">
+        <!-- Clean Subtle Shortcuts Guide -->
+        <div class="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-500 pt-1">
             <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">Space</kbd> Play/Pause</span>
             <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&larr;</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&rarr;</kbd> Seek 10s</span>
             <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&uarr;</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&darr;</kbd> Volume</span>
@@ -106,9 +120,27 @@
     document.addEventListener('DOMContentLoaded', () => {
         const videoElement = document.getElementById('player');
         const initialPosition = parseFloat("{{ initial_time }}") || 0;
+        const totalDuration = parseFloat("{{ (movie.duration or 0) * 60 }}") || 0;
+        const qualityVersions = {{ quality_versions|tojson|safe if quality_versions else '[]' }};
+        let currentMovieId = parseInt("{{ movie.id }}");
+        let currentOffset = (initialPosition > 5) ? Math.floor(initialPosition) : 0;
+        let isSeekingReload = false;
+        let isUserSeeking = false;
+        let seekDebounceTimer = null;
 
-        // Initialize Plyr with OTT features
-        const player = new Plyr(videoElement, {
+        function formatTime(seconds) {
+            seconds = Math.max(0, Math.floor(seconds));
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            if (h > 0) {
+                return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+            }
+            return `${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        // Configure Plyr options
+        const plyrOptions = {
             controls: [
                 'play-large',
                 'restart',
@@ -125,83 +157,338 @@
                 'airplay',
                 'fullscreen'
             ],
+            duration: totalDuration > 0 ? totalDuration : undefined,
             seekTime: 10,
             keyboard: { focused: true, global: true },
             tooltips: { controls: true, seek: true },
             speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+        };
+
+        // Initialize Plyr
+        const player = new Plyr(videoElement, plyrOptions);
+
+        // Bind custom currentTime getter & setter on Plyr player instance.
+        // This ensures Plyr's entire timeline UI, seekbar position, dragging, tooltips,
+        // and keyboard/button controls stay 100% in sync with our backend stream remuxer (?ss=)
+        Object.defineProperty(player, 'currentTime', {
+            get() {
+                return currentOffset + (videoElement.currentTime || 0);
+            },
+            set(targetSeconds) {
+                if (isSeekingReload) return;
+                debouncedSeek(targetSeconds);
+            },
+            configurable: true
         });
 
-        // Set initial resume time when ready
-        player.on('loadedmetadata', () => {
-            if (initialPosition > 5 && initialPosition < player.duration - 30) {
-                player.currentTime = initialPosition;
+        function debouncedSeek(targetSeconds) {
+            targetSeconds = Math.max(0, Math.min(targetSeconds, totalDuration > 0 ? totalDuration - 1 : targetSeconds));
+            
+            // Immediately reflect targeted time on display for snappy responsiveness
+            if (player.elements.display && player.elements.display.currentTime) {
+                player.elements.display.currentTime.innerText = formatTime(targetSeconds);
+            }
+
+            if (seekDebounceTimer) clearTimeout(seekDebounceTimer);
+            seekDebounceTimer = setTimeout(() => {
+                seekToTarget(targetSeconds);
+            }, 120);
+        }
+
+        // Fast timeline seeking: requests transmux stream starting at selected playhead
+        function seekToTarget(targetSeconds) {
+            if (seekDebounceTimer) {
+                clearTimeout(seekDebounceTimer);
+                seekDebounceTimer = null;
+            }
+
+            targetSeconds = Math.max(0, Math.min(targetSeconds, totalDuration > 0 ? totalDuration - 1 : targetSeconds));
+
+            // Check if target is already inside video element's local buffered range
+            const localTarget = targetSeconds - currentOffset;
+            let canLocalSeek = false;
+            if (localTarget >= 0 && videoElement.buffered.length > 0) {
+                for (let i = 0; i < videoElement.buffered.length; i++) {
+                    if (localTarget >= videoElement.buffered.start(i) && localTarget < (videoElement.buffered.end(i) - 0.5)) {
+                        canLocalSeek = true;
+                        break;
+                    }
+                }
+            }
+
+            if (canLocalSeek) {
+                videoElement.currentTime = localTarget;
+                return;
+            }
+
+            // Perform server-side transmux seek via ?ss=
+            isSeekingReload = true;
+            currentOffset = Math.floor(targetSeconds);
+
+            const newSrc = `/stream/${currentMovieId}?ss=${currentOffset}`;
+            videoElement.src = newSrc;
+            videoElement.load();
+            videoElement.play().catch(e => {});
+
+            // Update seekbar and display immediately so playhead stays at seek position
+            if (totalDuration > 0 && player.elements.inputs && player.elements.inputs.seek) {
+                const pct = (currentOffset / totalDuration) * 100;
+                player.elements.inputs.seek.value = pct;
+                if (player.elements.progress) {
+                    player.elements.progress.value = pct;
+                }
+            }
+            if (player.elements.display && player.elements.display.currentTime) {
+                player.elements.display.currentTime.innerText = formatTime(currentOffset);
+            }
+
+            const onResumed = () => {
+                isSeekingReload = false;
+                isUserSeeking = false;
+                videoElement.removeEventListener('playing', onResumed);
+                videoElement.removeEventListener('canplay', onResumed);
+            };
+            videoElement.addEventListener('playing', onResumed, { once: true });
+            videoElement.addEventListener('canplay', onResumed, { once: true });
+
+            setTimeout(() => {
+                isSeekingReload = false;
+                isUserSeeking = false;
+            }, 3500);
+        }
+
+        // Set initial duration and playhead text when Plyr is ready
+        player.on('ready', () => {
+            if (totalDuration > 0 && player.elements.display && player.elements.display.duration) {
+                player.elements.display.duration.innerText = formatTime(totalDuration);
+            }
+            if (currentOffset > 0 && player.elements.display && player.elements.display.currentTime) {
+                player.elements.display.currentTime.innerText = formatTime(currentOffset);
+            }
+            if (totalDuration > 0 && player.elements.inputs && player.elements.inputs.seek && currentOffset > 0) {
+                const pct = (currentOffset / totalDuration) * 100;
+                player.elements.inputs.seek.value = pct;
+                if (player.elements.progress) {
+                    player.elements.progress.value = pct;
+                }
+            }
+
+            // Direct listeners on seek input for drag/click commitment
+            const seekInput = player.elements.inputs ? player.elements.inputs.seek : null;
+            if (seekInput) {
+                const onStart = () => { isUserSeeking = true; };
+                const onEnd = () => {
+                    if (seekDebounceTimer) {
+                        clearTimeout(seekDebounceTimer);
+                        seekDebounceTimer = null;
+                    }
+                    if (totalDuration > 0) {
+                        const pct = parseFloat(seekInput.value) || 0;
+                        seekToTarget((pct / 100) * totalDuration);
+                    }
+                    setTimeout(() => { isUserSeeking = false; }, 200);
+                };
+
+                seekInput.addEventListener('pointerdown', onStart);
+                seekInput.addEventListener('mousedown', onStart);
+                seekInput.addEventListener('touchstart', onStart, { passive: true });
+
+                seekInput.addEventListener('change', onEnd);
+                seekInput.addEventListener('pointerup', onEnd);
+                seekInput.addEventListener('mouseup', onEnd);
+                seekInput.addEventListener('touchend', onEnd);
+            }
+
+            // Custom handler for Plyr's rewind and fast-forward buttons
+            if (player.elements.buttons) {
+                if (player.elements.buttons.rewind) {
+                    player.elements.buttons.rewind.addEventListener('click', (e) => {
+                        e.stopImmediatePropagation();
+                        stepSeek(-10);
+                    }, true);
+                }
+                if (player.elements.buttons.fastForward) {
+                    player.elements.buttons.fastForward.addEventListener('click', (e) => {
+                        e.stopImmediatePropagation();
+                        stepSeek(10);
+                    }, true);
+                }
             }
         });
 
-        // Heartbeat progress saving every 8 seconds
+        // Seamless Quality Switcher: preserves exact playback position across resolutions
+        window.switchQuality = function(targetId, targetResolution, qualityVal) {
+            if (targetId === currentMovieId) return;
+
+            const currentTotal = currentOffset + (videoElement.currentTime || 0);
+            currentMovieId = targetId;
+
+            // Update browser URL without reloading page
+            window.history.replaceState(null, '', `/watch/${targetId}`);
+
+            // Switch to target resolution at exact current playhead
+            seekToTarget(currentTotal);
+
+            // Update Top Bar Quality Label
+            const labelEl = document.getElementById('current-quality-label');
+            if (labelEl) labelEl.innerText = targetResolution;
+
+            // Update Dropdown checkmarks
+            document.querySelectorAll('.quality-item-btn').forEach(btn => {
+                const btnId = parseInt(btn.getAttribute('data-movie-id'));
+                const checkEl = btn.querySelector('.active-check');
+                if (btnId === targetId) {
+                    btn.classList.add('text-brand-red', 'font-bold', 'bg-brand-red/10');
+                    btn.classList.remove('text-slate-200');
+                    if (checkEl) checkEl.classList.remove('hidden');
+                } else {
+                    btn.classList.remove('text-brand-red', 'font-bold', 'bg-brand-red/10');
+                    btn.classList.add('text-slate-200');
+                    if (checkEl) checkEl.classList.add('hidden');
+                }
+            });
+
+            // Close Top Bar Dropdown
+            const dropdown = document.getElementById('quality-dropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+        };
+
+        // Top bar quality dropdown toggle
+        const qualityBtn = document.getElementById('quality-btn');
+        const qualityDropdown = document.getElementById('quality-dropdown');
+        if (qualityBtn && qualityDropdown) {
+            qualityBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                qualityDropdown.classList.toggle('hidden');
+            });
+            document.addEventListener('click', () => {
+                qualityDropdown.classList.add('hidden');
+            });
+        }
+
+        // Smooth 10s Rewind / Fast Forward handler
+        function stepSeek(delta) {
+            const currentTotal = currentOffset + (videoElement.currentTime || 0);
+            seekToTarget(currentTotal + delta);
+        }
+
+        // Keyboard arrow seeking
+        window.addEventListener('keydown', (e) => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                stepSeek(-10);
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                stepSeek(10);
+            }
+        });
+
+        // Keep timeline time display in sync and save progress every 8s
         let lastReportTime = 0;
         player.on('timeupdate', () => {
-            const current = player.currentTime;
-            if (Math.abs(current - lastReportTime) >= 8) {
-                lastReportTime = current;
-                fetch('/api/movies/{{ movie.id }}/progress', {
+            if (isSeekingReload || isUserSeeking || seekDebounceTimer) return;
+
+            const currentTotal = currentOffset + (videoElement.currentTime || 0);
+            const fullDuration = totalDuration > 0 ? totalDuration : (player.duration || 0);
+
+            if (player.elements.display && player.elements.display.currentTime) {
+                player.elements.display.currentTime.innerText = formatTime(currentTotal);
+            }
+            if (totalDuration > 0 && player.elements.display && player.elements.display.duration) {
+                player.elements.display.duration.innerText = formatTime(totalDuration);
+            }
+            if (totalDuration > 0 && player.elements.inputs && player.elements.inputs.seek) {
+                const pct = (currentTotal / totalDuration) * 100;
+                player.elements.inputs.seek.value = pct;
+                if (player.elements.progress) {
+                    player.elements.progress.value = pct;
+                }
+            }
+
+            if (Math.abs(currentTotal - lastReportTime) >= 8) {
+                lastReportTime = currentTotal;
+                fetch(`/api/movies/${currentMovieId}/progress`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        position: current,
-                        duration: player.duration || 0
+                        position: currentTotal,
+                        duration: fullDuration
                     })
-                }).catch(e => console.log('Progress save failed:', e));
+                }).catch(e => {});
             }
         });
 
-        // Save progress when paused or user leaves
+        // Save progress when paused
         player.on('pause', () => {
-            fetch('/api/movies/{{ movie.id }}/progress', {
+            const currentTotal = currentOffset + (videoElement.currentTime || 0);
+            const fullDuration = totalDuration > 0 ? totalDuration : (player.duration || 0);
+            fetch(`/api/movies/${currentMovieId}/progress`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    position: player.currentTime,
-                    duration: player.duration || 0
+                    position: currentTotal,
+                    duration: fullDuration
                 })
             }).catch(e => {});
         });
 
-        // Browser HEVC & AV1 capability testing
-        function testCodecs() {
-            const checkStatus = document.getElementById('hevc-check-status');
-            const hevcHint = document.getElementById('hevc-hint');
+        // Fullscreen dynamic controls auto-hide & mouse activity detection
+        let fsHideTimer = null;
+        const playerContainer = player.elements.container;
 
-            let hevcSupported = false;
-            let av1Supported = false;
-
-            if (window.MediaSource) {
-                hevcSupported = MediaSource.isTypeSupported('video/mp4; codecs="hev1.1.6.L93.B0"') ||
-                                MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L93.B0"');
-                av1Supported = MediaSource.isTypeSupported('video/mp4; codecs="av01.0.08M.10"') ||
-                               MediaSource.isTypeSupported('video/webm; codecs="av01.0.08M.10"');
-            }
-
-            const movieCodec = "{{ movie.codec }}".toUpperCase();
-            if (movieCodec.includes("HEVC") || movieCodec.includes("H265")) {
-                if (hevcSupported) {
-                    checkStatus.innerHTML = '<span class="text-emerald-400 font-bold flex items-center gap-1">✓ Native HEVC Hardware Playback Active</span>';
-                } else {
-                    checkStatus.innerHTML = '<span class="text-amber-400 font-semibold">⚠ HEVC Playback depends on browser/GPU hardware extensions</span>';
-                    hevcHint.classList.remove('hidden');
-                }
-            } else if (movieCodec.includes("AV1")) {
-                if (av1Supported) {
-                    checkStatus.innerHTML = '<span class="text-emerald-400 font-bold flex items-center gap-1">✓ Native AV1 Hardware Playback Active</span>';
-                } else {
-                    checkStatus.innerHTML = '<span class="text-amber-400 font-semibold">AV1 decoding standard check</span>';
-                }
-            } else {
-                checkStatus.innerHTML = '<span class="text-emerald-400 font-bold flex items-center gap-1">✓ Standard Web Playback Active</span>';
+        function hideFsControls() {
+            if (player.fullscreen && player.fullscreen.active && !player.paused) {
+                playerContainer.classList.add('autohide-controls');
             }
         }
 
-        testCodecs();
+        function showFsControls() {
+            playerContainer.classList.remove('autohide-controls');
+            clearTimeout(fsHideTimer);
+            if (player.fullscreen && player.fullscreen.active && !player.paused) {
+                fsHideTimer = setTimeout(hideFsControls, 2400);
+            }
+        }
+
+        player.on('enterfullscreen', () => {
+            clearTimeout(fsHideTimer);
+            fsHideTimer = setTimeout(hideFsControls, 2000);
+        });
+
+        player.on('exitfullscreen', () => {
+            clearTimeout(fsHideTimer);
+            playerContainer.classList.remove('autohide-controls');
+        });
+
+        playerContainer.addEventListener('mousemove', () => {
+            if (player.fullscreen && player.fullscreen.active) {
+                showFsControls();
+            }
+        });
+
+        playerContainer.addEventListener('pointermove', () => {
+            if (player.fullscreen && player.fullscreen.active) {
+                showFsControls();
+            }
+        });
+
+        playerContainer.addEventListener('touchstart', () => {
+            if (player.fullscreen && player.fullscreen.active) {
+                showFsControls();
+            }
+        }, { passive: true });
+
+        player.on('pause', () => {
+            clearTimeout(fsHideTimer);
+            playerContainer.classList.remove('autohide-controls');
+        });
+
+        player.on('play', () => {
+            if (player.fullscreen && player.fullscreen.active) {
+                fsHideTimer = setTimeout(hideFsControls, 2000);
+            }
+        });
     });
 </script>
 {% endblock %}

@@ -19,8 +19,8 @@
     display: flex;
     overflow-x: auto;
     scroll-behavior: smooth;
-    gap: 1rem;
-    padding-bottom: 1.25rem;
+    gap: 1.25rem;
+    padding-bottom: 1.5rem;
     scrollbar-width: thin;
     scrollbar-color: #222734 transparent;
 }
@@ -35,7 +35,30 @@
     border-radius: 3px;
 }
 .carousel-track::-webkit-scrollbar-thumb:hover {
-    background: #e50914;
+    background: #e5a00d;
+}
+
+.carousel-track > .movie-tile {
+    flex: 0 0 10.5rem;
+    width: 10.5rem;
+}
+@media (min-width: 640px) {
+    .carousel-track > .movie-tile {
+        flex: 0 0 12.5rem;
+        width: 12.5rem;
+    }
+}
+@media (min-width: 1024px) {
+    .carousel-track > .movie-tile {
+        flex: 0 0 14rem;
+        width: 14rem;
+    }
+}
+@media (min-width: 1440px) {
+    .carousel-track > .movie-tile {
+        flex: 0 0 15.5rem;
+        width: 15.5rem;
+    }
 }
 
 /* Movie Card Hover Dynamics */
@@ -44,7 +67,7 @@
 }
 .movie-card:hover {
     transform: translateY(-6px) scale(1.03);
-    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.8), 0 0 16px rgba(229, 9, 20, 0.25);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.8), 0 0 16px rgba(229, 160, 13, 0.25);
     z-index: 20;
 }
 

@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from app.database import engine, Base, SessionLocal
 from app.auth import init_default_users
 from app.routes import auth_routes, movie_routes, stream_routes, admin_routes, superadmin_routes
@@ -42,6 +42,8 @@ async def lifespan(app: FastAPI):
     try:
         init_default_users(db)
         await init_default_folders(db)
+        from app.tmdb import enrich_all_missing_movies
+        asyncio.create_task(enrich_all_missing_movies(SessionLocal))
     finally:
         db.close()
     yield
@@ -56,6 +58,10 @@ app = FastAPI(
 
 # Mount Static Assets
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("app/static/img/favicon.ico")
 
 # Mount Routers
 app.include_router(auth_routes.router)

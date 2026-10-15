@@ -5,6 +5,20 @@
 {% block content %}
 <div class="relative pb-16">
 
+    {% if request.query_params.get('password_changed') == '1' %}
+    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <div class="bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 px-5 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-between shadow-xl">
+            <div class="flex items-center space-x-2.5">
+                <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400 flex-none"></i>
+                <span><strong>Password updated successfully!</strong> Welcome to FilmsOverWeb. Your permanent account password is now active.</span>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="text-emerald-400 hover:text-white transition cursor-pointer">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
     {% if hero_movie %}
     <!-- Hero Billboard Section (Netflix / Prime Video Style) -->
     <div class="relative w-full h-[65vh] min-h-[480px] max-h-[720px] overflow-hidden">
@@ -15,7 +29,7 @@
         <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-transparent to-black/40"></div>
 
         <!-- Hero Content Text Overlay -->
-        <div class="absolute bottom-12 left-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full z-10">
+        <div class="absolute bottom-12 left-0 right-0 w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 z-10">
             <div class="max-w-2xl space-y-4">
                 <!-- Badges -->
                 <div class="flex flex-wrap items-center gap-2">
@@ -47,11 +61,11 @@
 
                 <!-- Action Buttons -->
                 <div class="flex items-center space-x-4 pt-2">
-                    <a href="/watch/{{ hero_movie.id }}" class="bg-brand-red hover:bg-brand-redHover text-white px-6 py-3 rounded-lg font-bold text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
+                    <a href="/watch/{{ hero_movie.id }}" class="bg-brand-red hover:bg-brand-redHover text-black px-6 py-3 rounded-xl font-black text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
                         <i data-lucide="play" class="w-5 h-5 fill-current"></i>
                         <span>Watch Now</span>
                     </a>
-                    <a href="/movie/{{ hero_movie.id }}" class="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 px-5 py-3 rounded-lg font-semibold text-sm flex items-center space-x-2 backdrop-blur transition">
+                    <a href="/movie/{{ hero_movie.id }}" class="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 px-5 py-3 rounded-xl font-semibold text-sm flex items-center space-x-2 backdrop-blur transition">
                         <i data-lucide="info" class="w-5 h-5"></i>
                         <span>More Details</span>
                     </a>
@@ -61,7 +75,7 @@
     </div>
     {% else %}
     <!-- Empty State Banner -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
         <div class="inline-flex p-4 bg-brand-surface rounded-2xl border border-brand-border mb-6">
             <i data-lucide="film" class="w-16 h-16 text-brand-red"></i>
         </div>
@@ -70,7 +84,7 @@
             Connect your Google Drive folders containing your movies. FilmsOverWeb will automatically scan them, parse titles, fetch TMDB posters & metadata, and allow direct full-quality streaming.
         </p>
         {% if user.role in ['admin', 'superadmin'] %}
-        <a href="/admin/folders" class="inline-flex items-center space-x-2 bg-brand-red hover:bg-brand-redHover text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-brand-red/30 transition">
+        <a href="/admin/folders" class="inline-flex items-center space-x-2 bg-brand-red hover:bg-brand-redHover text-black font-extrabold px-6 py-3 rounded-xl shadow-lg shadow-brand-red/30 transition">
             <i data-lucide="folder-plus" class="w-5 h-5"></i>
             <span>Add Google Drive Folder</span>
         </a>
@@ -80,41 +94,48 @@
     </div>
     {% endif %}
 
-    <!-- Carousel Rails -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 {% if hero_movie %}-mt-8 z-20 relative{% endif %}">
+    <!-- Carousel Rails (Expanded to 90% full page width) -->
+    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12 {% if hero_movie %}-mt-10 z-20 relative{% endif %}">
 
         <!-- Continue Watching (if present) -->
         {% if continue_watching %}
         <div>
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center space-x-2">
                     <i data-lucide="history" class="w-5 h-5 text-brand-red"></i>
                     <span>Continue Watching</span>
                 </h2>
             </div>
             <div class="carousel-track">
                 {% for item in continue_watching %}
-                <div class="flex-none w-52 sm:w-64 bg-brand-surface border border-brand-border rounded-xl overflow-hidden group movie-card relative">
-                    <a href="/watch/{{ item.movie.id }}" class="block relative aspect-video bg-slate-900">
-                        <img src="{{ item.movie.backdrop_path or item.movie.poster_path }}" alt="{{ item.movie.title }}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                            <span class="w-12 h-12 rounded-full bg-brand-red/90 text-white flex items-center justify-center shadow-lg">
-                                <i data-lucide="play" class="w-6 h-6 fill-current ml-0.5"></i>
+                <a href="/watch/{{ item.movie.id }}" class="group cursor-pointer block w-full movie-tile">
+                    <!-- Neat Rounded Corner Poster Tile with Progress Bar -->
+                    <div class="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
+                        <img src="{{ item.movie.poster_path }}" alt="{{ item.movie.title }}" loading="lazy" class="w-full h-full object-cover">
+                        
+                        <!-- Hover Play Indicator -->
+                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-200">
+                            <span class="w-12 h-12 rounded-full bg-brand-red text-black flex items-center justify-center shadow-xl transform group-hover:scale-110 transition">
+                                <i data-lucide="play" class="w-6 h-6 fill-current ml-0.5 text-black"></i>
                             </span>
                         </div>
-                        <!-- Progress Bar at bottom -->
-                        <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-800">
+
+                        <!-- Progress Bar along bottom of poster -->
+                        <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/80">
                             <div class="h-full bg-brand-red" style="width: {{ item.progress_percent }}%;"></div>
                         </div>
-                    </a>
-                    <div class="p-3">
-                        <div class="flex items-center justify-between text-xs text-slate-400 mb-1">
-                            <span>{{ item.movie.year or 'Movie' }}</span>
-                            <span class="text-brand-red font-semibold">{{ item.progress_percent }}% watched</span>
-                        </div>
-                        <h3 class="text-sm font-bold text-white truncate"><a href="/movie/{{ item.movie.id }}">{{ item.movie.title }}</a></h3>
                     </div>
-                </div>
+
+                    <!-- Movie Name with Release Year Below -->
+                    <div class="pt-2.5 px-1">
+                        <h3 class="text-xs sm:text-sm font-medium text-slate-200 group-hover:text-white truncate transition-colors" title="{{ item.movie.title }}{% if item.movie.year %} ({{ item.movie.year }}){% endif %}">
+                            {{ item.movie.title }}{% if item.movie.year %} ({{ item.movie.year }}){% endif %}
+                        </h3>
+                        <div class="text-[11px] text-brand-red font-semibold pt-0.5">
+                            {{ item.progress_percent }}% watched
+                        </div>
+                    </div>
+                </a>
                 {% endfor %}
             </div>
         </div>
@@ -124,7 +145,7 @@
         {% if recently_added %}
         <div>
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+                <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center space-x-2">
                     <i data-lucide="sparkles" class="w-5 h-5 text-brand-blue"></i>
                     <span>Recently Added from Google Drive</span>
                 </h2>
@@ -140,48 +161,6 @@
             </div>
         </div>
         {% endif %}
-
-        <!-- Top Rated Movies -->
-        {% if top_rated %}
-        <div>
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-white flex items-center space-x-2">
-                    <i data-lucide="trophy" class="w-5 h-5 text-amber-400"></i>
-                    <span>Top Rated & Trending</span>
-                </h2>
-                <a href="/movies?sort=rating" class="text-xs text-amber-400 hover:underline font-semibold flex items-center space-x-1">
-                    <span>Explore All</span>
-                    <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-                </a>
-            </div>
-            <div class="carousel-track">
-                {% for movie in top_rated %}
-                    {% include "components/movie_card.html" %}
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Genre Sections -->
-        {% for section in genre_sections %}
-        <div>
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-white flex items-center space-x-2">
-                    <i data-lucide="layers" class="w-5 h-5 text-slate-400"></i>
-                    <span>{{ section.genre }} Movies</span>
-                </h2>
-                <a href="/movies?genre={{ section.genre }}" class="text-xs text-slate-400 hover:text-white hover:underline font-semibold flex items-center space-x-1">
-                    <span>See All {{ section.genre }}</span>
-                    <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-                </a>
-            </div>
-            <div class="carousel-track">
-                {% for movie in section.movies %}
-                    {% include "components/movie_card.html" %}
-                {% endfor %}
-            </div>
-        </div>
-        {% endfor %}
 
     </div>
 </div>

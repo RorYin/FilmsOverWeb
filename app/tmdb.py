@@ -1,11 +1,14 @@
 import httpx
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from app.config import settings
-from app.models import SystemSetting
+from app.models import SystemSetting, Movie
 
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
+
+# In-Memory Cache to minimize TMDB API calls
+_TMDB_CACHE: Dict[str, Dict[str, Any]] = {}
 
 def get_active_tmdb_key(db: Optional[Session] = None) -> str:
     if db:
@@ -62,10 +65,31 @@ async def fetch_movie_full_details(tmdb_id: int, api_key: str) -> Optional[Dict[
             print(f"[TMDB] Details fetch error for ID {tmdb_id}: {e}")
     return None
 
+LANGUAGE_MAP = {
+    "ta": "Tamil", "kn": "Kannada", "te": "Telugu", "ml": "Malayalam",
+    "hi": "Hindi", "en": "English", "fr": "French", "es": "Spanish",
+    "de": "German", "it": "Italian", "ja": "Japanese", "ko": "Korean",
+    "zh": "Chinese", "ru": "Russian", "pt": "Portuguese", "bn": "Bengali",
+    "mr": "Marathi", "pa": "Punjabi", "gu": "Gujarati", "ur": "Urdu"
+}
+
+def resolve_language_name(code: Optional[str], spoken_languages: list) -> str:
+    if not code:
+        return "English"
+    code_clean = code.lower().strip()
+    for sp in spoken_languages:
+        if sp.get("iso_639_1") == code_clean:
+            return sp.get("english_name") or sp.get("name") or code_clean.capitalize()
+    return LANGUAGE_MAP.get(code_clean, code_clean.capitalize())
+
 async def enrich_movie_data(title: str, year: Optional[int] = None, api_key: Optional[str] = None) -> Dict[str, Any]:
     """
-    Search and fetch rich metadata from TMDB. Falls back gracefully if TMDB key is missing or search yields no results.
+    Search and fetch rich metadata from TMDB with memory and DB-level caching.
     """
+    cache_key = f"{title.strip().lower()}_{year or 0}"
+    if cache_key in _TMDB_CACHE and _TMDB_CACHE[cache_key].get("tmdb_id"):
+        return _TMDB_CACHE[cache_key]
+
     default_meta = {
         "tmdb_id": None,
         "title": title,
@@ -81,7 +105,8 @@ async def enrich_movie_data(title: str, year: Optional[int] = None, api_key: Opt
         "genres": "Drama, Cinema",
         "cast": "",
         "director": "",
-        "trailer_url": None
+        "trailer_url": None,
+        "original_language": "English"
     }
 
     if not api_key:
@@ -106,6 +131,11 @@ async def enrich_movie_data(title: str, year: Optional[int] = None, api_key: Opt
     # Process genres
     genres_list = [g.get("name") for g in details.get("genres", []) if g.get("name")]
     genres_str = ", ".join(genres_list) if genres_list else "Cinema"
+
+    # Process language
+    orig_lang_code = details.get("original_language")
+    spoken_list = details.get("spoken_languages", [])
+    resolved_lang = resolve_language_name(orig_lang_code, spoken_list)
 
     # Process credits
     cast_list = []
@@ -134,7 +164,7 @@ async def enrich_movie_data(title: str, year: Optional[int] = None, api_key: Opt
         except ValueError:
             pass
 
-    return {
+    enriched = {
         "tmdb_id": tmdb_id,
         "title": details.get("title") or title,
         "original_title": details.get("original_title") or title,
@@ -149,5 +179,70 @@ async def enrich_movie_data(title: str, year: Optional[int] = None, api_key: Opt
         "genres": genres_str,
         "cast": ", ".join(cast_list),
         "director": director,
-        "trailer_url": trailer_url
+        "trailer_url": trailer_url,
+        "original_language": resolved_lang
     }
+
+    # Cache result
+    _TMDB_CACHE[cache_key] = enriched
+    return enriched
+
+async def enrich_all_missing_movies(db_factory):
+    """
+    Scans the database and fetches TMDB posters and details for any movies that
+    are missing them (e.g. added before TMDB API key was saved).
+    Skips movies that are already enriched with valid tmdb_id to conserve API calls.
+    """
+    from app.parser import parse_filename
+    db = db_factory()
+    try:
+        api_key = get_active_tmdb_key(db)
+        if not api_key:
+            print("[TMDB ENRICH] No TMDB key found. Skipping.")
+            return 0
+
+        # Find movies needing enrichment
+        candidates = db.query(Movie).filter(
+            (Movie.tmdb_id == None) | 
+            (Movie.poster_path == None) | 
+            (Movie.poster_path.like("%poster-placeholder%"))
+        ).all()
+
+        if not candidates:
+            print("[TMDB ENRICH] All movies already have TMDB metadata cached.")
+            return 0
+
+        print(f"[TMDB ENRICH] Found {len(candidates)} movies to enrich from TMDB...")
+        updated_count = 0
+        for m in candidates:
+            parsed = parse_filename(m.file_name)
+            meta = await enrich_movie_data(parsed["title"], parsed["year"], api_key)
+            if meta.get("tmdb_id"):
+                m.tmdb_id = meta["tmdb_id"]
+                m.title = meta["title"]
+                m.original_title = meta["original_title"]
+                m.year = meta["year"]
+                m.overview = meta["overview"]
+                m.tagline = meta["tagline"]
+                m.poster_path = meta["poster_path"]
+                m.backdrop_path = meta["backdrop_path"]
+                m.rating = meta["rating"]
+                m.vote_count = meta["vote_count"]
+                m.duration = meta["duration"]
+                m.genres = meta["genres"]
+                m.cast = meta["cast"]
+                m.director = meta["director"]
+                m.trailer_url = meta["trailer_url"]
+                m.original_language = meta.get("original_language", "English")
+                updated_count += 1
+                print(f"[TMDB ENRICH] Enriched: '{m.title}' ({m.year}) - Poster: {m.poster_path}")
+
+        db.commit()
+        print(f"[TMDB ENRICH] Successfully enriched {updated_count} movies.")
+        return updated_count
+    except Exception as e:
+        print(f"[TMDB ENRICH] Error during enrichment: {e}")
+        db.rollback()
+        return 0
+    finally:
+        db.close()

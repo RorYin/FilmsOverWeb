@@ -3,7 +3,7 @@
 {% block title %}Explore Movies - FilmsOverWeb{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
     <!-- Header & Search -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-brand-border">
@@ -44,7 +44,7 @@
         <!-- Codecs Filter Bar -->
         <div class="flex items-center space-x-2 overflow-x-auto pb-1 text-xs">
             <span class="text-slate-400 font-semibold uppercase tracking-wider text-[11px] mr-1">Codecs:</span>
-            <a href="/movies?{% if q %}q={{ q }}&{% endif %}{% if selected_genre %}genre={{ selected_genre }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if not selected_codec %}bg-brand-red text-white border-brand-red font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+            <a href="/movies?{% if q %}q={{ q }}&{% endif %}{% if selected_genre %}genre={{ selected_genre }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if not selected_codec %}bg-brand-red text-black border-brand-red font-extrabold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
                 All Codecs
             </a>
             <a href="/movies?codec=HEVC&{% if q %}q={{ q }}&{% endif %}{% if selected_genre %}genre={{ selected_genre }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if selected_codec == 'HEVC' %}bg-rose-600 text-white border-rose-600 font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">

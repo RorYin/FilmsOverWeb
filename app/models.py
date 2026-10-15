@@ -15,6 +15,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(50), default="guest", nullable=False)  # "superadmin", "admin", "guest"
     is_active = Column(Boolean, default=True)
+    must_change_password = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utc_now)
 
     watch_history = relationship("WatchProgress", back_populates="user", cascade="all, delete-orphan")
@@ -63,6 +64,7 @@ class Movie(Base):
     cast = Column(String(1000), default="")   # Top actors
     director = Column(String(255), default="")
     trailer_url = Column(String(1024), nullable=True)
+    original_language = Column(String(50), default="English")
 
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

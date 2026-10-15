@@ -153,7 +153,8 @@ async def perform_sync_folder(folder_db_id: int, db_factory):
                     genres=meta["genres"],
                     cast=meta["cast"],
                     director=meta["director"],
-                    trailer_url=meta["trailer_url"]
+                    trailer_url=meta["trailer_url"],
+                    original_language=meta.get("original_language", "English")
                 )
                 db.add(movie)
                 synced_count += 1
@@ -242,7 +243,8 @@ async def create_guest(
         name=name.strip() if name and name.strip() else "Guest User",
         hashed_password=hashed,
         role="guest",
-        is_active=True
+        is_active=True,
+        must_change_password=True
     )
     db.add(new_guest)
     db.commit()

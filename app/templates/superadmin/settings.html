@@ -22,7 +22,14 @@
     {% if success %}
     <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2 shadow-lg">
         <i data-lucide="check-circle" class="w-4 h-4 flex-none"></i>
-        <span>System settings saved successfully and loaded into runtime!</span>
+        <span>System settings saved successfully and loaded into runtime! Any movies missing TMDB data are being enriched in the background.</span>
+    </div>
+    {% endif %}
+
+    {% if enriched %}
+    <div class="bg-blue-500/10 border border-blue-500/30 text-blue-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2 shadow-lg">
+        <i data-lucide="refresh-cw" class="w-4 h-4 flex-none animate-spin"></i>
+        <span>TMDB Enrichment triggered in background! Movies with missing metadata or posters are being updated.</span>
     </div>
     {% endif %}
 
@@ -32,6 +39,19 @@
         <span><strong>Gmail Test Result:</strong> {{ test_result.message }}</span>
     </div>
     {% endif %}
+
+    <div class="flex items-center justify-between bg-brand-surface/60 border border-brand-border px-5 py-3 rounded-xl">
+        <div class="text-xs text-slate-300">
+            <span class="font-bold text-white">TMDB Metadata Synchronization:</span>
+            <span class="text-slate-400 ml-1">Cached movies won't re-query TMDB. New movies or movies without posters will be fetched.</span>
+        </div>
+        <form method="POST" action="/superadmin/settings/enrich-tmdb">
+            <button type="submit" class="bg-brand-blue/20 hover:bg-brand-blue/30 text-brand-blue border border-brand-blue/40 px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center space-x-1.5 transition">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Enrich Missing TMDB Metadata Now</span>
+            </button>
+        </form>
+    </div>
 
     <form method="POST" action="/superadmin/settings/save" class="space-y-8">
 
@@ -96,6 +116,23 @@
                 <div>
                     <h2 class="text-base font-bold text-white">Google Mail Automation (Guest Onboarding)</h2>
                     <p class="text-xs text-slate-400">Sends auto-generated login credentials to new guests from <code class="text-slate-200 font-mono">drmnbot@gmail.com</code>.</p>
+                </div>
+            </div>
+
+            <!-- Gmail App Password Guide Notice -->
+            <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs text-amber-200/90 flex items-start space-x-2.5">
+                <i data-lucide="info" class="w-4 h-4 text-amber-400 flex-none mt-0.5"></i>
+                <div class="space-y-1.5">
+                    <p class="font-bold text-amber-300">How to configure Gmail SMTP (drmnbot@gmail.com):</p>
+                    <p class="text-slate-300 leading-relaxed">
+                        Google <strong>blocks</strong> normal Gmail account passwords on SMTP. You must generate a dedicated 16-character <strong>Google App Password</strong>:
+                    </p>
+                    <ol class="list-decimal list-inside text-slate-300 space-y-0.5 pl-1">
+                        <li>Make sure <strong>2-Step Verification</strong> is ON for your Google account.</li>
+                        <li>Open <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-amber-400 font-bold underline hover:text-amber-300">myaccount.google.com/apppasswords &nearr;</a></li>
+                        <li>Type "FilmsOverWeb" as app name and click <strong>Create</strong>.</li>
+                        <li>Copy the 16 characters (e.g. <code class="bg-slate-900 px-1.5 py-0.5 rounded text-amber-300 font-mono">abcd efgh ijkl mnop</code>) and paste below.</li>
+                    </ol>
                 </div>
             </div>
 
