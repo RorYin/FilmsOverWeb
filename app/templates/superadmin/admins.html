@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Administrators - SuperAdmin Control Panel{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-brand-border">
+        <div>
+            <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>SuperAdmin Restricted Area</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-white">Administrator Accounts</h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                Manage system administrators who have permissions to add and sync Google Drive folders and invite guests.
+            </p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="bg-rose-500/10 border border-rose-500/30 text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2">
+        <i data-lucide="alert-triangle" class="w-4 h-4 flex-none"></i>
+        <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Create Admin Form Card -->
+    <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 shadow-xl">
+        <h2 class="text-lg font-bold text-white mb-2 flex items-center space-x-2">
+            <i data-lucide="user-plus" class="w-5 h-5 text-amber-400"></i>
+            <span>Create New Administrator</span>
+        </h2>
+        <p class="text-xs text-slate-400 mb-5">
+            Admins can add Google Drive folder links, trigger movie syncs, and invite guests. SuperAdmins can also alter system API configurations.
+        </p>
+
+        <form method="POST" action="/superadmin/admins/create" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address *</label>
+                <input type="email" name="email" required placeholder="admin@domain.com" class="w-full bg-slate-900 border border-brand-border focus:border-amber-400 text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Full Name *</label>
+                <input type="text" name="name" required placeholder="Admin Name" class="w-full bg-slate-900 border border-brand-border focus:border-amber-400 text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password *</label>
+                <input type="password" name="password" required placeholder="Strong Password" class="w-full bg-slate-900 border border-brand-border focus:border-amber-400 text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none transition">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Role Level</label>
+                <select name="role" class="w-full bg-slate-900 border border-brand-border focus:border-amber-400 text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none transition cursor-pointer">
+                    <option value="admin">Admin (Drive & Guests only)</option>
+                    <option value="superadmin">SuperAdmin (Full Control & Config)</option>
+                </select>
+            </div>
+
+            <div class="sm:col-span-2 lg:col-span-4 flex justify-end pt-2">
+                <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-black font-bold px-6 py-2.5 rounded-xl text-sm flex items-center space-x-2 shadow-lg shadow-amber-500/20 transition">
+                    <i data-lucide="shield-plus" class="w-4 h-4"></i>
+                    <span>Register Administrator</span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Administrators Table -->
+    <div class="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden shadow-xl">
+        <div class="px-6 py-4 border-b border-brand-border">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-slate-400"></i>
+                <span>Active Administrators ({{ admins|length }})</span>
+            </h3>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm text-slate-300">
+                <thead class="bg-slate-900/60 uppercase text-[11px] font-bold tracking-wider text-slate-400 border-b border-brand-border">
+                    <tr>
+                        <th class="px-6 py-3.5">Administrator</th>
+                        <th class="px-6 py-3.5">Email</th>
+                        <th class="px-6 py-3.5">Role Level</th>
+                        <th class="px-6 py-3.5">Member Since</th>
+                        <th class="px-6 py-3.5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-brand-border">
+                    {% for a in admins %}
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="px-6 py-4 font-bold text-white flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-full {% if a.role == 'superadmin' %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% else %}bg-blue-500/20 text-blue-300 border border-blue-500/30{% endif %} flex items-center justify-center text-xs font-bold uppercase">
+                                {{ a.name[:1] if a.name else a.email[:1] }}
+                            </div>
+                            <span>{{ a.name or 'Admin' }}</span>
+                        </td>
+                        <td class="px-6 py-4 font-mono text-xs text-slate-300">
+                            {{ a.email }}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="text-xs uppercase tracking-wider font-extrabold px-2 py-0.5 rounded {% if a.role == 'superadmin' %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% else %}bg-blue-500/20 text-blue-300 border border-blue-500/30{% endif %}">
+                                {{ a.role }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-400">
+                            {{ a.created_at.strftime('%b %d, %Y') if a.created_at else 'Recent' }}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            {% if a.id != user.id %}
+                            <form method="POST" action="/superadmin/admins/{{ a.id }}/delete" onsubmit="return confirm('Revoke admin account for {{ a.email }}?');" class="inline">
+                                <button type="submit" class="bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 p-1.5 rounded-lg transition" title="Delete Admin">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="text-[11px] text-slate-500 italic">Current Session</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - SuperAdmin Control Panel{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-brand-border">
+        <div>
+            <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>SuperAdmin Restricted Area</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-white">System Configuration</h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                Configure TMDB API keys, Google Drive access credentials, and Google Mail automation.
+            </p>
+        </div>
+    </div>
+
+    {% if success %}
+    <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2 shadow-lg">
+        <i data-lucide="check-circle" class="w-4 h-4 flex-none"></i>
+        <span>System settings saved successfully and loaded into runtime!</span>
+    </div>
+    {% endif %}
+
+    {% if test_result %}
+    <div class="{% if test_result.success %}bg-emerald-500/10 border-emerald-500/30 text-emerald-300{% else %}bg-rose-500/10 border-rose-500/30 text-rose-300{% endif %} border px-4 py-3 rounded-xl text-xs flex items-center space-x-2">
+        <i data-lucide="{% if test_result.success %}check-circle{% else %}alert-circle{% endif %}" class="w-4 h-4 flex-none"></i>
+        <span><strong>Gmail Test Result:</strong> {{ test_result.message }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/superadmin/settings/save" class="space-y-8">
+
+        <!-- 1. TMDB Settings -->
+        <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-brand-border/60">
+                <div class="flex items-center space-x-3">
+                    <span class="w-9 h-9 rounded-xl bg-blue-500/20 text-brand-blue flex items-center justify-center">
+                        <i data-lucide="film" class="w-5 h-5"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-base font-bold text-white">The Movie Database (TMDB)</h2>
+                        <p class="text-xs text-slate-400">Enriches filenames with official posters, backdrops, ratings, overview, and cast.</p>
+                    </div>
+                </div>
+                <a href="https://www.themoviedb.org/settings/api" target="_blank" class="text-xs text-brand-blue hover:underline flex items-center space-x-1">
+                    <span>Get Free TMDB API Key</span>
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                </a>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">TMDB API Key (v3 auth)</label>
+                <input type="text" name="tmdb_api_key" value="{{ settings.tmdb_api_key }}" placeholder="Paste your 32-character TMDB API Key here" class="w-full bg-slate-900 border border-brand-border focus:border-brand-blue text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                <p class="text-[11px] text-slate-500 mt-1">If empty, FilmsOverWeb falls back to clean filename parsing and built-in artwork.</p>
+            </div>
+        </div>
+
+        <!-- 2. Google Drive Settings -->
+        <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="flex items-center space-x-3 pb-3 border-b border-brand-border/60">
+                <span class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <i data-lucide="hard-drive" class="w-5 h-5"></i>
+                </span>
+                <div>
+                    <h2 class="text-base font-bold text-white">Google Drive API Configuration</h2>
+                    <p class="text-xs text-slate-400">Configure how FilmsOverWeb authenticates with Google Drive to index and stream videos.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Google API Key (For Public / Shared Folders)</label>
+                    <input type="text" name="google_api_key" value="{{ settings.google_api_key }}" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-brand-border focus:border-brand-blue text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                    <p class="text-[11px] text-slate-500 mt-1">Required if you are indexing folders shared with "Anyone with the link can view".</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Google Service Account JSON (For Private / Team Drives)</label>
+                    <textarea name="google_service_account_json" rows="4" placeholder='{"type": "service_account", "project_id": "...", "private_key": "..."}' class="w-full bg-slate-900 border border-brand-border focus:border-brand-blue text-slate-200 text-xs rounded-xl p-3 outline-none font-mono transition">{{ settings.google_service_account_json }}</textarea>
+                    <p class="text-[11px] text-slate-500 mt-1">Recommended for high reliability: paste your Google Cloud Service Account JSON key.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. Google Mail Automation (Gmail SMTP) -->
+        <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
+            <div class="flex items-center space-x-3 pb-3 border-b border-brand-border/60">
+                <span class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <i data-lucide="mail" class="w-5 h-5"></i>
+                </span>
+                <div>
+                    <h2 class="text-base font-bold text-white">Google Mail Automation (Guest Onboarding)</h2>
+                    <p class="text-xs text-slate-400">Sends auto-generated login credentials to new guests from <code class="text-slate-200 font-mono">drmnbot@gmail.com</code>.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Sender Email Address</label>
+                    <input type="email" name="smtp_user" value="{{ settings.smtp_user }}" required class="w-full bg-slate-900 border border-brand-border text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                        Google App Password
+                        <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-emerald-400 hover:underline normal-case text-[11px] font-normal ml-2">Generate App Password &nearr;</a>
+                    </label>
+                    <input type="password" name="smtp_password" value="{{ settings.smtp_password }}" placeholder="16-character Google App Password (e.g. abcd efgh ijkl mnop)" class="w-full bg-slate-900 border border-brand-border focus:border-emerald-500 text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">SMTP Host</label>
+                    <input type="text" name="smtp_host" value="{{ settings.smtp_host }}" required class="w-full bg-slate-900 border border-brand-border text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">SMTP Port</label>
+                    <input type="number" name="smtp_port" value="{{ settings.smtp_port }}" required class="w-full bg-slate-900 border border-brand-border text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2 pt-2">
+                <input type="checkbox" id="ssl_cb" name="smtp_use_ssl" value="true" {% if settings.smtp_use_ssl == 'true' %}checked{% endif %} class="w-4 h-4 rounded text-brand-red bg-slate-900 border-brand-border focus:ring-0">
+                <label for="ssl_cb" class="text-xs text-slate-300">Use Direct SSL (Port 465 for Gmail SSL)</label>
+            </div>
+        </div>
+
+        <div class="flex justify-end">
+            <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-black font-extrabold px-8 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-xl shadow-amber-500/20 transition transform hover:scale-[1.02]">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>Save All Settings</span>
+            </button>
+        </div>
+    </form>
+
+    <!-- Test Email Dispatch Tool -->
+    <div class="bg-brand-surface/70 border border-brand-border rounded-2xl p-6 shadow-xl space-y-4">
+        <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+            <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i>
+            <span>Test Gmail Automation</span>
+        </h3>
+        <p class="text-xs text-slate-400">
+            Verify your Gmail connection by sending a test guest invitation email to any recipient.
+        </p>
+
+        <form method="POST" action="/superadmin/settings/test-email" class="flex flex-col sm:flex-row gap-3">
+            <input type="email" name="test_to" required placeholder="recipient@example.com" class="flex-1 bg-slate-900 border border-brand-border text-slate-200 text-xs sm:text-sm rounded-xl px-4 py-2.5 outline-none">
+            <button type="submit" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold px-5 py-2.5 rounded-xl text-xs flex items-center justify-center space-x-1.5 transition">
+                <i data-lucide="mail-check" class="w-4 h-4"></i>
+                <span>Dispatch Test Email</span>
+            </button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" fill="none">
+  <defs>
+    <radialGradient id="heroGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#1e2433"/>
+      <stop offset="100%" stop-color="#0b0c0e"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#heroGrad)"/>
+  <circle cx="960" cy="480" r="140" fill="#e50914" opacity="0.1"/>
+  <path d="M920 420 L1020 480 L920 540 Z" fill="#e50914" opacity="0.8"/>
+  <text x="960" y="660" font-family="system-ui, sans-serif" font-size="42" font-weight="900" fill="#f8fafc" text-anchor="middle" letter-spacing="2">FILMS OVER WEB CINEMA</text>
+  <text x="960" y="710" font-family="system-ui, sans-serif" font-size="20" fill="#94a3b8" text-anchor="middle">Ready to stream from Google Drive in uncompressed high quality</text>
+</svg>

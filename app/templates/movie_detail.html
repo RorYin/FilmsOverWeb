@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}{{ movie.title }} ({{ movie.year }}) - FilmsOverWeb{% endblock %}
+
+{% block content %}
+<div class="relative pb-20">
+
+    <!-- Hero Backdrop Banner -->
+    <div class="relative w-full h-[50vh] min-h-[380px] max-h-[550px] overflow-hidden">
+        <img src="{{ movie.backdrop_path or movie.poster_path }}" alt="{{ movie.title }}" class="w-full h-full object-cover object-center filter brightness-75">
+        <div class="absolute inset-0 hero-gradient"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-[#0b0c0e]/60 to-transparent"></div>
+    </div>
+
+    <!-- Main Content Container overlapping backdrop -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-44 relative z-10">
+        <div class="flex flex-col md:flex-row gap-8 items-start">
+            
+            <!-- Poster Column -->
+            <div class="w-56 sm:w-64 flex-none mx-auto md:mx-0">
+                <div class="rounded-2xl overflow-hidden border-2 border-brand-border shadow-2xl bg-brand-surface aspect-[2/3] relative">
+                    <img src="{{ movie.poster_path }}" alt="{{ movie.title }}" class="w-full h-full object-cover">
+                    
+                    {% if movie.rating > 0 %}
+                    <div class="absolute top-3 right-3 bg-black/80 backdrop-blur text-amber-400 font-extrabold text-sm px-2.5 py-1 rounded-lg flex items-center space-x-1 shadow-lg">
+                        <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+                        <span>{{ movie.rating }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Primary Play Action -->
+                <div class="mt-5 space-y-2.5">
+                    <a href="/watch/{{ movie.id }}" class="w-full bg-brand-red hover:bg-brand-redHover text-white py-3.5 px-4 rounded-xl font-black text-center flex items-center justify-center space-x-2 shadow-xl shadow-brand-red/30 transition transform hover:scale-[1.02]">
+                        <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                        <span>
+                            {% if progress and progress.position_seconds > 10 and not progress.completed %}
+                            Resume Playback
+                            {% else %}
+                            Watch Full Quality
+                            {% endif %}
+                        </span>
+                    </a>
+
+                    {% if progress and progress.position_seconds > 10 and not progress.completed %}
+                    <div class="text-center text-xs text-slate-400">
+                        Saved point: {{ (progress.position_seconds / 60)|int }}m {{ (progress.position_seconds % 60)|int }}s
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Details Column -->
+            <div class="flex-1 space-y-6">
+                <!-- Title & Tagline -->
+                <div>
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                        <span class="bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                            {{ movie.year or 'Movie' }}
+                        </span>
+                        <span class="bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                            {{ movie.duration }} min
+                        </span>
+                        <span class="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-bold px-2.5 py-0.5 rounded-full">
+                            {{ movie.resolution }}
+                        </span>
+
+                        {% if movie.codec == 'HEVC' %}
+                        <span class="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-black px-2.5 py-0.5 rounded-full">
+                            HEVC / H.265 Direct Stream
+                        </span>
+                        {% elif movie.codec == 'AV1' %}
+                        <span class="bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-black px-2.5 py-0.5 rounded-full">
+                            AV1 Accelerated
+                        </span>
+                        {% else %}
+                        <span class="bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                            {{ movie.codec }}
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                        {{ movie.title }}
+                    </h1>
+                    {% if movie.tagline %}
+                    <p class="text-slate-400 italic text-sm sm:text-base mt-1">"{{ movie.tagline }}"</p>
+                    {% endif %}
+                </div>
+
+                <!-- Genres -->
+                {% if movie.genres %}
+                <div class="flex flex-wrap gap-2">
+                    {% for g in movie.genres.split(',') %}
+                    <a href="/movies?genre={{ g.strip() }}" class="bg-brand-surface border border-brand-border hover:border-slate-500 text-slate-300 px-3 py-1 rounded-md text-xs font-medium transition">
+                        {{ g.strip() }}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Overview -->
+                <div class="space-y-2">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Synopsis</h3>
+                    <p class="text-slate-200 text-sm sm:text-base leading-relaxed bg-brand-surface/40 p-4 rounded-xl border border-brand-border/60">
+                        {{ movie.overview }}
+                    </p>
+                </div>
+
+                <!-- Cast & Crew -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                    {% if movie.director %}
+                    <div class="bg-brand-surface p-3.5 rounded-xl border border-brand-border">
+                        <span class="text-slate-500 uppercase tracking-wider text-[11px] font-bold block mb-1">Director</span>
+                        <span class="text-white font-medium">{{ movie.director }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if movie.cast %}
+                    <div class="bg-brand-surface p-3.5 rounded-xl border border-brand-border">
+                        <span class="text-slate-500 uppercase tracking-wider text-[11px] font-bold block mb-1">Starring Cast</span>
+                        <span class="text-white font-medium">{{ movie.cast }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Technical Drive Specs Card -->
+                <div class="bg-brand-surface/70 border border-brand-border rounded-xl p-4 space-y-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
+                        <i data-lucide="hard-drive" class="w-4 h-4 text-brand-blue"></i>
+                        <span>Google Drive Source Specs</span>
+                    </h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
+                        <div>
+                            <span class="text-slate-500 block">File Name</span>
+                            <span class="text-slate-300 font-mono truncate block" title="{{ movie.file_name }}">{{ movie.file_name }}</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 block">Size</span>
+                            <span class="text-slate-300 font-semibold">
+                                {% if movie.file_size %}
+                                {{ (movie.file_size / (1024 * 1024 * 1024))|round(2) }} GB
+                                {% else %}
+                                Unknown
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 block">Video Codec</span>
+                            <span class="text-emerald-400 font-bold">{{ movie.codec }}</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-500 block">Streaming Mode</span>
+                            <span class="text-brand-blue font-semibold">HTTP 206 Direct Lossless</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trailer link if available -->
+                {% if movie.trailer_url %}
+                <div class="pt-2">
+                    <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-2 text-rose-400 hover:text-rose-300 text-xs font-semibold">
+                        <i data-lucide="youtube" class="w-4 h-4"></i>
+                        <span>Watch Official Trailer on YouTube &rarr;</span>
+                    </a>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+        <!-- Related Movies -->
+        {% if related_movies %}
+        <div class="mt-16 pt-8 border-t border-brand-border">
+            <h2 class="text-xl font-bold text-white mb-4">You May Also Like</h2>
+            <div class="carousel-track">
+                {% for movie in related_movies %}
+                    {% include "components/movie_card.html" %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

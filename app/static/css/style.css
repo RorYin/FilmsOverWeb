@@ -1,0 +1,67 @@
+/* Custom FilmsOverWeb OTT Styles */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0b0c0e;
+}
+::-webkit-scrollbar-thumb {
+    background: #1f242e;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #374151;
+}
+
+/* Horizontal scrolling rails (Prime Video / Netflix carousel style) */
+.carousel-track {
+    display: flex;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    gap: 1rem;
+    padding-bottom: 1.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: #222734 transparent;
+}
+.carousel-track::-webkit-scrollbar {
+    height: 6px;
+}
+.carousel-track::-webkit-scrollbar-track {
+    background: transparent;
+}
+.carousel-track::-webkit-scrollbar-thumb {
+    background: #222734;
+    border-radius: 3px;
+}
+.carousel-track::-webkit-scrollbar-thumb:hover {
+    background: #e50914;
+}
+
+/* Movie Card Hover Dynamics */
+.movie-card {
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.movie-card:hover {
+    transform: translateY(-6px) scale(1.03);
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.8), 0 0 16px rgba(229, 9, 20, 0.25);
+    z-index: 20;
+}
+
+/* Hero Billboard Gradient Overlay */
+.hero-gradient {
+    background: linear-gradient(0deg, #0b0c0e 0%, rgba(11, 12, 14, 0.8) 25%, rgba(11, 12, 14, 0.2) 60%, rgba(11, 12, 14, 0.9) 100%),
+                linear-gradient(90deg, #0b0c0e 0%, rgba(11, 12, 14, 0.85) 35%, rgba(11, 12, 14, 0) 70%);
+}
+
+.hero-vignette {
+    box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+}
+
+/* Glassmorphism panel */
+.glass-panel {
+    background: rgba(20, 23, 31, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}

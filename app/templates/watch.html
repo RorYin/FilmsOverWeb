@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}Watching {{ movie.title }} - FilmsOverWeb Cinema{% endblock %}
+
+{% block head %}
+<!-- Plyr CSS for modern OTT controls -->
+<link rel="stylesheet" href="https://cdn.plyr.io/3.7.8/plyr.css" />
+<style>
+    :root {
+        --plyr-color-main: #e50914;
+        --plyr-video-background: #000000;
+        --plyr-control-radius: 8px;
+    }
+    .plyr--video {
+        border-radius: 12px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.9);
+    }
+    .cinema-backdrop {
+        background: radial-gradient(circle at center, #181d28 0%, #08090b 85%);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cinema-backdrop min-h-[90vh] py-6 sm:py-10">
+    <div class="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 space-y-5">
+        
+        <!-- Top Cinema Navigation & Status -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-brand-surface/80 border border-brand-border px-4 py-3 rounded-xl backdrop-blur">
+            <div class="flex items-center space-x-3">
+                <a href="/movie/{{ movie.id }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-lg transition" title="Back to Movie Details">
+                    <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                </a>
+                <div>
+                    <h1 class="text-base sm:text-lg font-bold text-white flex items-center space-x-2">
+                        <span>{{ movie.title }}</span>
+                        <span class="text-xs font-normal text-slate-400">({{ movie.year }})</span>
+                    </h1>
+                    <p class="text-[11px] text-slate-400 font-mono truncate max-w-sm sm:max-w-md">
+                        {{ movie.file_name }}
+                    </p>
+                </div>
+            </div>
+
+            <!-- Codec and Stream Badges -->
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-md font-semibold flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Direct Lossless Stream</span>
+                </span>
+                
+                <span id="codec-live-badge" class="bg-brand-surface border border-brand-border text-xs px-2.5 py-1 rounded-md font-bold text-slate-300">
+                    Codec: {{ movie.codec }}
+                </span>
+
+                <span class="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs px-2.5 py-1 rounded-md font-bold">
+                    {{ movie.resolution }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Video Player Container -->
+        <div class="relative bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl">
+            <video id="player" playsinline controls preload="auto" class="w-full aspect-video">
+                <source src="/stream/{{ movie.id }}" type="{{ movie.mime_type or 'video/mp4' }}">
+                Your web browser does not support the video tag.
+            </video>
+        </div>
+
+        <!-- Codec Diagnostics & Hardware Acceleration Helper -->
+        <div id="codec-info-panel" class="bg-brand-surface/60 border border-brand-border rounded-xl p-4 text-xs space-y-2">
+            <div class="flex items-center justify-between">
+                <div class="font-bold text-slate-200 flex items-center space-x-2">
+                    <i data-lucide="cpu" class="w-4 h-4 text-brand-blue"></i>
+                    <span>Hardware Decoder & Codec Support Check</span>
+                </div>
+                <div id="hevc-check-status" class="text-slate-400">
+                    Checking browser codec engine...
+                </div>
+            </div>
+            <p class="text-slate-400 leading-relaxed">
+                FilmsOverWeb streams the raw byte stream directly from Google Drive using HTTP Range Requests (lossless original quality). For HEVC (H.265) and AV1, your browser uses native hardware GPU decoding without lossy server re-encoding.
+            </p>
+            <div id="hevc-hint" class="hidden p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-300">
+                💡 <strong>Notice for HEVC playback on Windows browsers:</strong> If playback shows a black screen with audio, ensure Windows has the <em>HEVC Video Extensions</em> installed or enable hardware acceleration under your browser settings (e.g. Edge and Chrome natively support HEVC when GPU decoding is active).
+            </div>
+        </div>
+
+        <!-- Quick Keyboard Shortcuts Guide -->
+        <div class="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-500 pt-2">
+            <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">Space</kbd> Play/Pause</span>
+            <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&larr;</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&rarr;</kbd> Seek 10s</span>
+            <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&uarr;</kbd> <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">&darr;</kbd> Volume</span>
+            <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">F</kbd> Fullscreen</span>
+            <span><kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-300">M</kbd> Mute</span>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Plyr Script -->
+<script src="https://cdn.plyr.io/3.7.8/plyr.polyfilled.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const videoElement = document.getElementById('player');
+        const initialPosition = parseFloat("{{ initial_time }}") || 0;
+
+        // Initialize Plyr with OTT features
+        const player = new Plyr(videoElement, {
+            controls: [
+                'play-large',
+                'restart',
+                'rewind',
+                'play',
+                'fast-forward',
+                'progress',
+                'current-time',
+                'duration',
+                'mute',
+                'volume',
+                'settings',
+                'pip',
+                'airplay',
+                'fullscreen'
+            ],
+            seekTime: 10,
+            keyboard: { focused: true, global: true },
+            tooltips: { controls: true, seek: true },
+            speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] }
+        });
+
+        // Set initial resume time when ready
+        player.on('loadedmetadata', () => {
+            if (initialPosition > 5 && initialPosition < player.duration - 30) {
+                player.currentTime = initialPosition;
+            }
+        });
+
+        // Heartbeat progress saving every 8 seconds
+        let lastReportTime = 0;
+        player.on('timeupdate', () => {
+            const current = player.currentTime;
+            if (Math.abs(current - lastReportTime) >= 8) {
+                lastReportTime = current;
+                fetch('/api/movies/{{ movie.id }}/progress', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        position: current,
+                        duration: player.duration || 0
+                    })
+                }).catch(e => console.log('Progress save failed:', e));
+            }
+        });
+
+        // Save progress when paused or user leaves
+        player.on('pause', () => {
+            fetch('/api/movies/{{ movie.id }}/progress', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    position: player.currentTime,
+                    duration: player.duration || 0
+                })
+            }).catch(e => {});
+        });
+
+        // Browser HEVC & AV1 capability testing
+        function testCodecs() {
+            const checkStatus = document.getElementById('hevc-check-status');
+            const hevcHint = document.getElementById('hevc-hint');
+
+            let hevcSupported = false;
+            let av1Supported = false;
+
+            if (window.MediaSource) {
+                hevcSupported = MediaSource.isTypeSupported('video/mp4; codecs="hev1.1.6.L93.B0"') ||
+                                MediaSource.isTypeSupported('video/mp4; codecs="hvc1.1.6.L93.B0"');
+                av1Supported = MediaSource.isTypeSupported('video/mp4; codecs="av01.0.08M.10"') ||
+                               MediaSource.isTypeSupported('video/webm; codecs="av01.0.08M.10"');
+            }
+
+            const movieCodec = "{{ movie.codec }}".toUpperCase();
+            if (movieCodec.includes("HEVC") || movieCodec.includes("H265")) {
+                if (hevcSupported) {
+                    checkStatus.innerHTML = '<span class="text-emerald-400 font-bold flex items-center gap-1">✓ Native HEVC Hardware Playback Active</span>';
+                } else {
+                    checkStatus.innerHTML = '<span class="text-amber-400 font-semibold">⚠ HEVC Playback depends on browser/GPU hardware extensions</span>';
+                    hevcHint.classList.remove('hidden');
+                }
+            } else if (movieCodec.includes("AV1")) {
+                if (av1Supported) {
+                    checkStatus.innerHTML = '<span class="text-emerald-400 font-bold flex items-center gap-1">✓ Native AV1 Hardware Playback Active</span>';
+                } else {
+                    checkStatus.innerHTML = '<span class="text-amber-400 font-semibold">AV1 decoding standard check</span>';
+                }
+            } else {
+                checkStatus.innerHTML = '<span class="text-emerald-400 font-bold flex items-center gap-1">✓ Standard Web Playback Active</span>';
+            }
+        }
+
+        testCodecs();
+    });
+</script>
+{% endblock %}

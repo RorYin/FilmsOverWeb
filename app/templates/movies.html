@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Explore Movies - FilmsOverWeb{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Header & Search -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-brand-border">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white">Movie Catalog</h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                Showing {{ movies|length }} titles from connected Google Drive folders
+            </p>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <form method="GET" action="/movies" class="flex flex-wrap items-center gap-3">
+            <!-- Search Query -->
+            <div class="relative">
+                <input type="text" name="q" placeholder="Filter titles, cast..." value="{{ q }}" class="bg-brand-surface border border-brand-border text-sm text-slate-200 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:border-brand-red w-48 sm:w-60">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-2.5 top-3"></i>
+            </div>
+
+            <!-- Sort By -->
+            <select name="sort" onchange="this.form.submit()" class="bg-brand-surface border border-brand-border text-xs sm:text-sm text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-brand-red cursor-pointer">
+                <option value="newest" {% if selected_sort == 'newest' %}selected{% endif %}>Recently Added</option>
+                <option value="rating" {% if selected_sort == 'rating' %}selected{% endif %}>Highest Rated</option>
+                <option value="year" {% if selected_sort == 'year' %}selected{% endif %}>Release Year</option>
+                <option value="title" {% if selected_sort == 'title' %}selected{% endif %}>Title (A-Z)</option>
+            </select>
+
+            {% if selected_genre %}
+            <input type="hidden" name="genre" value="{{ selected_genre }}">
+            {% endif %}
+            {% if selected_codec %}
+            <input type="hidden" name="codec" value="{{ selected_codec }}">
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Filter Chips (Codecs & Genres) -->
+    <div class="py-4 space-y-3">
+        <!-- Codecs Filter Bar -->
+        <div class="flex items-center space-x-2 overflow-x-auto pb-1 text-xs">
+            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[11px] mr-1">Codecs:</span>
+            <a href="/movies?{% if q %}q={{ q }}&{% endif %}{% if selected_genre %}genre={{ selected_genre }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if not selected_codec %}bg-brand-red text-white border-brand-red font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+                All Codecs
+            </a>
+            <a href="/movies?codec=HEVC&{% if q %}q={{ q }}&{% endif %}{% if selected_genre %}genre={{ selected_genre }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if selected_codec == 'HEVC' %}bg-rose-600 text-white border-rose-600 font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+                HEVC / H.265
+            </a>
+            <a href="/movies?codec=AV1&{% if q %}q={{ q }}&{% endif %}{% if selected_genre %}genre={{ selected_genre }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if selected_codec == 'AV1' %}bg-purple-600 text-white border-purple-600 font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+                AV1
+            </a>
+            <a href="/movies?codec=H.264&{% if q %}q={{ q }}&{% endif %}{% if selected_genre %}genre={{ selected_genre }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if selected_codec == 'H.264' %}bg-blue-600 text-white border-blue-600 font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+                H.264
+            </a>
+        </div>
+
+        <!-- Genres Filter Bar -->
+        {% if all_genres %}
+        <div class="flex items-center space-x-2 overflow-x-auto pb-2 text-xs">
+            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[11px] mr-1">Genres:</span>
+            <a href="/movies?{% if q %}q={{ q }}&{% endif %}{% if selected_codec %}codec={{ selected_codec }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border transition {% if not selected_genre %}bg-white/20 text-white border-white/40 font-bold{% else %}bg-brand-surface text-slate-400 border-brand-border hover:border-slate-500{% endif %}">
+                All
+            </a>
+            {% for g in all_genres %}
+            <a href="/movies?genre={{ g }}&{% if q %}q={{ q }}&{% endif %}{% if selected_codec %}codec={{ selected_codec }}&{% endif %}sort={{ selected_sort }}" class="px-3 py-1 rounded-full border whitespace-nowrap transition {% if selected_genre == g %}bg-brand-blue text-white border-brand-blue font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+                {{ g }}
+            </a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Movies Grid -->
+    {% if movies %}
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 pt-4">
+        {% for movie in movies %}
+            {% include "components/movie_card.html" %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-20 bg-brand-surface/40 rounded-2xl border border-brand-border my-6">
+        <i data-lucide="search-x" class="w-12 h-12 text-slate-500 mx-auto mb-3"></i>
+        <h3 class="text-lg font-bold text-white">No Movies Found</h3>
+        <p class="text-sm text-slate-400 max-w-md mx-auto mt-1 mb-4">
+            Try adjusting your search query or removing active genre and codec filters.
+        </p>
+        <a href="/movies" class="inline-block bg-slate-800 text-slate-200 border border-slate-700 px-4 py-2 rounded-lg text-xs font-semibold hover:bg-slate-700 transition">
+            Reset All Filters
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
