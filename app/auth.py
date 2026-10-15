@@ -96,34 +96,54 @@ def require_role(roles: list[str]):
     return role_checker
 
 def init_default_users(db: Session):
-    """Ensure at least one superadmin exists with the configured default credentials."""
-    # Check if legacy default superadmin exists and migrate to new credentials
+    """Ensure at least one superadmin exists with the configured credentials."""
+    target_email = settings.SUPERADMIN_EMAIL
+    target_password = settings.SUPERADMIN_PASSWORD
+    is_env_set = settings.SUPERADMIN_ENV_SET
+
+    # Check if legacy default superadmin exists and migrate
     old_default = db.query(User).filter(User.email == "drmnbot@gmail.com").first()
     if old_default:
-        old_default.email = settings.DEFAULT_SUPERADMIN_EMAIL
-        old_default.hashed_password = get_password_hash(settings.DEFAULT_SUPERADMIN_PASSWORD)
-        old_default.must_change_password = True
+        old_default.email = target_email
+        old_default.hashed_password = get_password_hash(target_password)
+        old_default.must_change_password = not is_env_set
         db.commit()
-        print(f"[AUTH] Migrated legacy default SuperAdmin to ({settings.DEFAULT_SUPERADMIN_EMAIL} / {settings.DEFAULT_SUPERADMIN_PASSWORD}) with must_change_password=True")
+        print(f"[AUTH] Migrated legacy default SuperAdmin to ({target_email}) with must_change_password={not is_env_set}")
 
     existing_superadmin = db.query(User).filter(User.role == "superadmin").first()
-    if not existing_superadmin:
-        email = settings.DEFAULT_SUPERADMIN_EMAIL
-        existing_user = db.query(User).filter(User.email == email).first()
+    if existing_superadmin:
+        if is_env_set:
+            # If explicit SuperAdmin environment variables are set, enforce them and bypass password change
+            needs_update = False
+            if existing_superadmin.email != target_email:
+                existing_superadmin.email = target_email
+                needs_update = True
+            if not verify_password(target_password, existing_superadmin.hashed_password):
+                existing_superadmin.hashed_password = get_password_hash(target_password)
+                needs_update = True
+            if existing_superadmin.must_change_password:
+                existing_superadmin.must_change_password = False
+                needs_update = True
+            if needs_update:
+                db.commit()
+                print(f"[AUTH] Configured SuperAdmin ({target_email}) from environment variables with must_change_password=False")
+    else:
+        existing_user = db.query(User).filter(User.email == target_email).first()
         if existing_user:
             existing_user.role = "superadmin"
-            existing_user.must_change_password = True
+            existing_user.hashed_password = get_password_hash(target_password)
+            existing_user.must_change_password = not is_env_set
             db.commit()
-            print(f"[AUTH] Promoted existing user {email} to SuperAdmin.")
+            print(f"[AUTH] Promoted existing user {target_email} to SuperAdmin with must_change_password={not is_env_set}.")
         else:
             default_admin = User(
-                email=email,
+                email=target_email,
                 name="Super Administrator",
-                hashed_password=get_password_hash(settings.DEFAULT_SUPERADMIN_PASSWORD),
+                hashed_password=get_password_hash(target_password),
                 role="superadmin",
-                must_change_password=True,
+                must_change_password=(not is_env_set),
                 is_active=True
             )
             db.add(default_admin)
             db.commit()
-            print(f"[AUTH] Created default SuperAdmin ({email} / {settings.DEFAULT_SUPERADMIN_PASSWORD}) with must_change_password=True")
+            print(f"[AUTH] Created SuperAdmin ({target_email}) with must_change_password={not is_env_set}")

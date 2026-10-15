@@ -172,5 +172,50 @@ class TestFilmsOverWeb(unittest.TestCase):
                 db.commit()
             db.close()
 
+    def test_07_superadmin_env_vars(self):
+        import os
+        from app.auth import init_default_users, verify_password
+        from app.config import settings
+
+        old_email_env = os.environ.get("SuperAdminEmail")
+        old_pw_env = os.environ.get("SuperAdminPassword")
+        try:
+            os.environ["SuperAdminEmail"] = "envadmin@customcinema.com"
+            os.environ["SuperAdminPassword"] = "EnvPassSecret2026!"
+            settings.SUPERADMIN_EMAIL = "envadmin@customcinema.com"
+            settings.SUPERADMIN_PASSWORD = "EnvPassSecret2026!"
+            settings.SUPERADMIN_ENV_SET = True
+
+            db = SessionLocal()
+            init_default_users(db)
+            admin = db.query(User).filter(User.role == "superadmin").first()
+            self.assertIsNotNone(admin)
+            self.assertEqual(admin.email, "envadmin@customcinema.com")
+            self.assertTrue(verify_password("EnvPassSecret2026!", admin.hashed_password))
+            self.assertFalse(admin.must_change_password)
+            db.close()
+        finally:
+            if old_email_env is not None:
+                os.environ["SuperAdminEmail"] = old_email_env
+            else:
+                os.environ.pop("SuperAdminEmail", None)
+            if old_pw_env is not None:
+                os.environ["SuperAdminPassword"] = old_pw_env
+            else:
+                os.environ.pop("SuperAdminPassword", None)
+            settings.SUPERADMIN_EMAIL = "test@gmail.com"
+            settings.SUPERADMIN_PASSWORD = "1q2w3e4r5t"
+            settings.SUPERADMIN_ENV_SET = False
+
+            db = SessionLocal()
+            admin = db.query(User).filter(User.role == "superadmin").first()
+            if admin:
+                from app.auth import get_password_hash
+                admin.email = "test@gmail.com"
+                admin.hashed_password = get_password_hash("1q2w3e4r5t")
+                admin.must_change_password = True
+                db.commit()
+            db.close()
+
 if __name__ == "__main__":
     unittest.main()

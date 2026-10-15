@@ -143,8 +143,9 @@ git push origin main
 5. Under **Advanced → Environment Variables**, add:
    - `SECRET_KEY`: *(Generate a secure random string)*
    - `TMDB_API_KEY`: *(Your TMDB API Key)*
-   - `DEFAULT_SUPERADMIN_EMAIL`: `test@gmail.com`
-   - `DEFAULT_SUPERADMIN_PASSWORD`: `1q2w3e4r5t`
+   - `SuperAdminEmail`: *(Optional: Custom SuperAdmin email - if set, password change prompt is bypassed)*
+   - `SuperAdminPassword`: *(Optional: Custom SuperAdmin password)*
+   - *(Note: If SuperAdminEmail and SuperAdminPassword are omitted, it rolls over to test@gmail.com / 1q2w3e4r5t with a first-time password change prompt)*
 6. Click **Create Web Service**.
 
 Render will automatically build the Docker image, install `ffmpeg`, install Python requirements, and launch Uvicorn. Your Cinema OTT will be live with full 4K streaming and audio transmuxing!

@@ -4,6 +4,27 @@ from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+def _resolve_superadmin_email() -> str:
+    for k in ("SuperAdminEmail", "SUPERADMIN_EMAIL", "SUPERADMINEMAIL", "DEFAULT_SUPERADMIN_EMAIL"):
+        v = os.getenv(k)
+        if v and v.strip():
+            return v.strip()
+    return "test@gmail.com"
+
+def _resolve_superadmin_password() -> str:
+    for k in ("SuperAdminPassword", "SUPERADMIN_PASSWORD", "SUPERADMINPASSWORD", "DEFAULT_SUPERADMIN_PASSWORD"):
+        v = os.getenv(k)
+        if v and v.strip():
+            return v.strip()
+    return "1q2w3e4r5t"
+
+def _is_superadmin_env_set() -> bool:
+    for k in ("SuperAdminEmail", "SUPERADMIN_EMAIL", "SUPERADMINEMAIL", "SuperAdminPassword", "SUPERADMIN_PASSWORD", "SUPERADMINPASSWORD"):
+        v = os.getenv(k)
+        if v and v.strip():
+            return True
+    return False
+
 class AppConfig(BaseModel):
     DATABASE_FILE: str = os.getenv("DATABASE_FILE", str(BASE_DIR / "films_over_web.json"))
     DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'films_over_web.db'}")
@@ -29,8 +50,11 @@ class AppConfig(BaseModel):
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_USE_SSL: bool = os.getenv("SMTP_USE_SSL", "true").lower() in ("true", "1", "yes")
 
-    # Initial SuperAdmin
-    DEFAULT_SUPERADMIN_EMAIL: str = os.getenv("DEFAULT_SUPERADMIN_EMAIL", "test@gmail.com")
-    DEFAULT_SUPERADMIN_PASSWORD: str = os.getenv("DEFAULT_SUPERADMIN_PASSWORD", "1q2w3e4r5t")
+    # SuperAdmin Configuration
+    SUPERADMIN_EMAIL: str = _resolve_superadmin_email()
+    SUPERADMIN_PASSWORD: str = _resolve_superadmin_password()
+    SUPERADMIN_ENV_SET: bool = _is_superadmin_env_set()
+    DEFAULT_SUPERADMIN_EMAIL: str = _resolve_superadmin_email()
+    DEFAULT_SUPERADMIN_PASSWORD: str = _resolve_superadmin_password()
 
 settings = AppConfig()
