@@ -1,7 +1,7 @@
-<a href="/series/{{ series.id }}" class="group cursor-pointer block w-full series-tile">
-    <!-- Neat Rounded Corner Poster Tile -->
+<a href="/series/{{ series.id }}" class="group cursor-pointer block w-full movie-tile series-tile">
+    <!-- Neat Rounded Corner Poster Tile matching movie-tile dimensions -->
     <div class="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
-        <img src="{{ series.poster_path }}" alt="{{ series.title }}" loading="lazy" class="w-full h-full object-cover">
+        <img src="{{ series.poster_path or series.backdrop_path or '/static/img/poster-placeholder.png' }}" alt="{{ series.title }}" loading="lazy" class="w-full h-full object-cover">
         
         <!-- TV Series Badge -->
         <div class="absolute top-2.5 right-2.5">
