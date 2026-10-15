@@ -54,17 +54,14 @@
                         <span class="text-white">FILMS<span class="text-brand-red">OVER</span>WEB</span>
                     </a>
                     
-                    <!-- Main Navigation Links: Movies, TV Shows & Recently Added -->
+                    <!-- Main Navigation Links: Movies & TV Shows -->
                     {% if user %}
                     <div class="hidden md:flex items-center space-x-2 text-sm font-medium">
-                        <a href="/movies" class="px-3.5 py-1.5 rounded-xl transition {% if request.url.path == '/movies' and not request.query_params.get('sort') %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
+                        <a href="/movies" class="px-3.5 py-1.5 rounded-xl transition {% if request.url.path.startswith('/movies') %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
                             Movies
                         </a>
                         <a href="/series" class="px-3.5 py-1.5 rounded-xl transition {% if request.url.path.startswith('/series') %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
                             TV Shows
-                        </a>
-                        <a href="/movies?sort=newest" class="px-3.5 py-1.5 rounded-xl transition {% if request.query_params.get('sort') == 'newest' %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
-                            Recently Added
                         </a>
                     </div>
                     {% endif %}
