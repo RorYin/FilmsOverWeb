@@ -78,6 +78,7 @@
                          controls
                          playsinline
                          doubletap
+                         sw="auto"
                          class="w-full h-full block">
             </movi-player>
         </div>
@@ -113,8 +114,8 @@
         const playerContainer = document.getElementById('player-container');
         const moviPlayer = document.getElementById('movi-player');
 
-        function buildStreamUrl(movieIdParam, fileIdParam, fileNameParam) {
-            if (cfWorkerUrl) {
+        function buildStreamUrl(movieIdParam, fileIdParam, fileNameParam, forceDirect = false) {
+            if (cfWorkerUrl && !forceDirect) {
                 let u = `${cfWorkerUrl}/?file_id=${encodeURIComponent(fileIdParam)}&name=${encodeURIComponent(fileNameParam)}`;
                 if (googleApiKey) u += `&key=${encodeURIComponent(googleApiKey)}`;
                 return u;
@@ -125,6 +126,21 @@
         // Initialize WASM Player
         const initialWasmUrl = buildStreamUrl(currentMovieId, currentGdriveId, currentFileName);
         moviPlayer.setAttribute('src', initialWasmUrl);
+
+        // Auto-fallback from Cloudflare Worker to local server stream if worker network fails
+        let fallbackAttempted = false;
+        function tryFallbackStream() {
+            if (cfWorkerUrl && !fallbackAttempted) {
+                fallbackAttempted = true;
+                const serverUrl = buildStreamUrl(currentMovieId, currentGdriveId, currentFileName, true);
+                moviPlayer.setAttribute('src', serverUrl);
+                if (typeof moviPlayer.load === 'function') {
+                    moviPlayer.load().catch(() => {});
+                }
+            }
+        }
+        moviPlayer.addEventListener('error', tryFallbackStream);
+        moviPlayer.addEventListener('mediaerror', tryFallbackStream);
 
         if (initialPosition > 5) {
             moviPlayer.addEventListener('loadedmetadata', () => {

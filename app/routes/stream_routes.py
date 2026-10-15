@@ -62,11 +62,40 @@ def get_stream_headers_and_url(file_id: str, client_range: str, db: Session) -> 
     url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t"
     return url, upstream_headers
 
-async def stream_gdrive_range(movie: Movie, range_header: Optional[str], db: Session):
-    total_size = movie.file_size or 0
+async def stream_gdrive_range(media_item, range_header: Optional[str], db: Session, is_head: bool = False):
+    total_size = getattr(media_item, "file_size", 0) or 0
     start, end = parse_and_bound_range(range_header, total_size)
 
-    url, upstream_headers = get_stream_headers_and_url(movie.gdrive_file_id, f"bytes={start}-{end}", db)
+    # Infer Content-Type
+    mime = getattr(media_item, "mime_type", None)
+    fn = getattr(media_item, "file_name", "").lower()
+    if not mime or mime == "video/mp4":
+        if fn.endswith(".mkv"):
+            mime = "video/x-matroska"
+        elif fn.endswith(".webm"):
+            mime = "video/webm"
+        else:
+            mime = "video/mp4"
+
+    content_range = f"bytes {start}-{end}/{total_size if total_size > 0 else '*'}"
+    content_length = str(end - start + 1) if range_header else (str(total_size) if total_size > 0 else "0")
+
+    response_headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Range": content_range,
+        "Content-Length": content_length,
+        "Content-Type": mime,
+        "Cache-Control": "public, max-age=3600",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Content-Type, Authorization, Accept",
+        "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, Content-Type, Content-Disposition"
+    }
+
+    if is_head:
+        return Response(content=b"", status_code=206 if range_header else 200, headers=response_headers)
+
+    url, upstream_headers = get_stream_headers_and_url(media_item.gdrive_file_id, f"bytes={start}-{end}", db)
 
     client = httpx.AsyncClient(follow_redirects=True, timeout=30.0)
     try:
@@ -81,33 +110,13 @@ async def stream_gdrive_range(movie: Movie, range_header: Optional[str], db: Ses
                 detail=f"Google Drive stream error ({r.status_code})."
             )
 
-        # Infer Content-Type
-        mime = movie.mime_type
-        if not mime or mime == "video/mp4":
-            if movie.file_name.lower().endswith(".mkv"):
-                mime = "video/x-matroska"
-            elif movie.file_name.lower().endswith(".webm"):
-                mime = "video/webm"
-            else:
-                mime = "video/mp4"
-
         # If total_size was 0, extract it from upstream content-range if available
         if total_size <= 0 and "content-range" in r.headers:
             try:
                 total_size = int(r.headers["content-range"].split("/")[-1])
+                response_headers["Content-Range"] = f"bytes {start}-{end}/{total_size}"
             except Exception:
                 pass
-
-        content_range = f"bytes {start}-{end}/{total_size if total_size > 0 else '*'}"
-        content_length = str(end - start + 1)
-
-        response_headers = {
-            "Accept-Ranges": "bytes",
-            "Content-Range": content_range,
-            "Content-Length": content_length,
-            "Content-Type": mime,
-            "Cache-Control": "public, max-age=3600"
-        }
 
         async def stream_generator():
             try:
@@ -126,7 +135,7 @@ async def stream_gdrive_range(movie: Movie, range_header: Optional[str], db: Ses
         await client.aclose()
         raise HTTPException(status_code=502, detail=f"Failed to connect to Google Drive upstream: {str(exc)}")
 
-@router.get("/stream/{movie_id}")
+@router.api_route("/stream/{movie_id}", methods=["GET", "HEAD", "OPTIONS"])
 async def stream_movie(
     movie_id: int,
     request: Request,
@@ -134,12 +143,15 @@ async def stream_movie(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional)
 ):
-    """
-    Unified Cinema Streaming Engine:
-    - Automatically supports all video & audio formats (Dolby 5.1, E-AC3, DTS, DTS-HD MA, etc.)
-    - Automatically remuxes MKV and multichannel audio to browser-supported fMP4 with -c:v copy (100% lossless 4K)
-    - Automatically handles seeking via ?ss={seconds} so only the requested play head is buffered
-    """
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization, Accept",
+            "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, Content-Type",
+            "Access-Control-Max-Age": "86400",
+        })
+
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -154,16 +166,25 @@ async def stream_movie(
     if is_mkv or has_audio_codecs or ss > 0.0:
         return await transmux_movie(movie_id, request, ss, db, user)
     else:
-        return await stream_gdrive_range(movie, request.headers.get("range"), db)
+        return await stream_gdrive_range(movie, request.headers.get("range"), db, is_head=(request.method == "HEAD"))
 
-@router.get("/stream/raw/{movie_id}")
+@router.api_route("/stream/raw/{movie_id}", methods=["GET", "HEAD", "OPTIONS"])
 async def stream_raw(
     movie_id: int,
     request: Request,
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional)
 ):
-    """Internal raw stream endpoint with bounded range requests for ffmpeg remuxing."""
+    """Raw stream endpoint with bounded range requests for client-side WASM player and ffmpeg."""
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization, Accept",
+            "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, Content-Type",
+            "Access-Control-Max-Age": "86400",
+        })
+
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -171,7 +192,7 @@ async def stream_raw(
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
-    return await stream_gdrive_range(movie, request.headers.get("range"), db)
+    return await stream_gdrive_range(movie, request.headers.get("range"), db, is_head=(request.method == "HEAD"))
 
 @router.get("/stream/transmux/{movie_id}")
 async def transmux_movie(
@@ -332,13 +353,22 @@ async def update_watch_progress(
     db.commit()
     return JSONResponse({"status": "ok", "completed": completed})
 
-@router.get("/stream/episode/raw/{episode_id}")
+@router.api_route("/stream/episode/raw/{episode_id}", methods=["GET", "HEAD", "OPTIONS"])
 async def stream_episode_raw(
     episode_id: int,
     request: Request,
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional)
 ):
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+            "Access-Control-Allow-Headers": "Range, Content-Type, Authorization, Accept",
+            "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, Content-Type",
+            "Access-Control-Max-Age": "86400",
+        })
+
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -346,7 +376,7 @@ async def stream_episode_raw(
     if not episode:
         raise HTTPException(status_code=404, detail="Episode not found")
 
-    return await stream_gdrive_range(episode, request.headers.get("range"), db)
+    return await stream_gdrive_range(episode, request.headers.get("range"), db, is_head=(request.method == "HEAD"))
 
 @router.post("/api/episodes/{episode_id}/progress")
 async def update_episode_watch_progress(

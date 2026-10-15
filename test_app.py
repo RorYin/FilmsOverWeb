@@ -401,6 +401,31 @@ class TestFilmsOverWeb(unittest.TestCase):
             db.commit()
         db.close()
 
+    def test_11_streaming_head_and_options_cors(self):
+        from app.auth import create_access_token
+
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={
+            "email": "test@gmail.com",
+            "password": "1q2w3e4r5t",
+            "next": "/"
+        })
+
+        tok = create_access_token({"sub": "test@gmail.com", "role": "superadmin"})
+
+        # 1. Test OPTIONS preflight for movie stream
+        options_resp = admin_client.options("/stream/raw/5")
+        self.assertEqual(options_resp.status_code, 204)
+        self.assertEqual(options_resp.headers.get("access-control-allow-origin"), "*")
+        self.assertIn("Range", options_resp.headers.get("access-control-allow-headers", ""))
+
+        # 2. Test HEAD probe for movie stream (used by movi-player WASM demuxer)
+        head_resp = admin_client.head(f"/stream/raw/5?token={tok}")
+        self.assertEqual(head_resp.status_code, 200)
+        self.assertEqual(head_resp.headers.get("accept-ranges"), "bytes")
+        self.assertEqual(head_resp.headers.get("access-control-allow-origin"), "*")
+        self.assertIn("Content-Range", head_resp.headers.get("access-control-expose-headers", ""))
+
 if __name__ == "__main__":
     unittest.main()
 
