@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}{{ series.title }} - FilmsOverWeb{% endblock %}
+
+{% block content %}
+<div class="relative pb-20">
+
+    <!-- Hero Backdrop Banner -->
+    <div class="relative w-full h-[50vh] min-h-[380px] max-h-[550px] overflow-hidden">
+        <img src="{{ series.backdrop_path or series.poster_path }}" alt="{{ series.title }}" class="w-full h-full object-cover object-center filter brightness-75">
+        <div class="absolute inset-0 hero-gradient"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-[#0b0c0e]/60 to-transparent"></div>
+    </div>
+
+    <!-- Main Content Container overlapping backdrop -->
+    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 -mt-44 relative z-10">
+        <div class="flex flex-col md:flex-row gap-8 items-start">
+            
+            <!-- Poster Column -->
+            <div class="w-56 sm:w-64 flex-none mx-auto md:mx-0">
+                <div class="rounded-2xl overflow-hidden border-2 border-brand-border shadow-2xl bg-brand-surface aspect-[2/3] relative">
+                    <img src="{{ series.poster_path }}" alt="{{ series.title }}" class="w-full h-full object-cover">
+                    
+                    {% if series.rating > 0 %}
+                    <div class="absolute top-3 right-3 bg-black/80 backdrop-blur text-amber-400 font-extrabold text-sm px-2.5 py-1 rounded-lg flex items-center space-x-1 shadow-lg">
+                        <i data-lucide="star" class="w-4 h-4 fill-current"></i>
+                        <span>{{ series.rating }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Primary Play / Resume Action -->
+                {% if resume_episode %}
+                <div class="mt-5 space-y-2.5">
+                    <a href="/watch/episode/{{ resume_episode.id }}" class="w-full bg-brand-red hover:bg-brand-redHover text-black py-3.5 px-4 rounded-xl font-black text-center flex items-center justify-center space-x-2 shadow-xl shadow-brand-red/30 transition transform hover:scale-[1.02]">
+                        <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                        <span>
+                            {% if episode_progress.get(resume_episode.id) and episode_progress[resume_episode.id].position > 10 and not episode_progress[resume_episode.id].completed %}
+                            Resume S{{ "%02d"|format(resume_episode.season_number) }}E{{ "%02d"|format(resume_episode.episode_number) }}
+                            {% else %}
+                            Watch S{{ "%02d"|format(resume_episode.season_number) }}E{{ "%02d"|format(resume_episode.episode_number) }}
+                            {% endif %}
+                        </span>
+                    </a>
+
+                    <div class="bg-brand-surface border border-brand-border rounded-xl p-3 text-center text-xs text-slate-400">
+                        <span class="text-slate-300 font-semibold">{{ series.seasons|length }} Season{{ 's' if series.seasons|length != 1 else '' }}</span> &bull; 
+                        <span>{{ series.episodes|length }} Episodes in Library</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Details Column -->
+            <div class="flex-1 space-y-6">
+                <!-- Title & Badges -->
+                <div>
+                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                        <span class="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                            TV Series
+                        </span>
+                        {% if series.year %}
+                        <span class="bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                            {{ series.year }}
+                        </span>
+                        {% endif %}
+                        <span class="bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                            {{ series.seasons|length }} Season{{ 's' if series.seasons|length != 1 else '' }}
+                        </span>
+
+                        {% if series.original_language %}
+                        <span class="bg-amber-500/25 text-amber-300 border border-amber-500/60 text-xs font-black px-3 py-0.5 rounded-full flex items-center space-x-1.5 shadow-sm shadow-amber-500/10">
+                            <i data-lucide="languages" class="w-3.5 h-3.5 text-amber-400"></i>
+                            <span>Original: {{ series.original_language }}</span>
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                                {{ series.title }}
+                            </h1>
+                        </div>
+                        {% if resume_episode %}
+                        <div class="flex-none">
+                            <a href="/watch/episode/{{ resume_episode.id }}" class="inline-flex items-center space-x-2 bg-brand-red hover:bg-brand-redHover text-black px-5 py-2.5 rounded-xl font-extrabold text-sm shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
+                                <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                                <span>Play Next</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Genres -->
+                {% if series.genres %}
+                <div class="flex flex-wrap gap-2">
+                    {% for g in series.genres.split(',') %}
+                    {% if g.strip() and g.strip() != 'TV Series' %}
+                    <a href="/series?genre={{ g.strip() }}" class="bg-brand-surface border border-brand-border hover:border-slate-500 text-slate-300 px-3 py-1 rounded-md text-xs font-medium transition">
+                        {{ g.strip() }}
+                    </a>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Overview -->
+                {% if series.overview %}
+                <div class="space-y-2">
+                    <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Synopsis</h3>
+                    <p class="text-slate-200 text-sm sm:text-base leading-relaxed bg-brand-surface/40 p-4 rounded-xl border border-brand-border/60">
+                        {{ series.overview }}
+                    </p>
+                </div>
+                {% endif %}
+
+                <!-- Creator & Cast Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs sm:text-sm">
+                    {% if series.creator %}
+                    <div class="bg-brand-surface p-3.5 rounded-xl border border-brand-border">
+                        <span class="text-slate-500 uppercase tracking-wider text-[11px] font-bold block mb-1">Creator / Showrunner</span>
+                        <span class="text-white font-medium">{{ series.creator }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if series.cast %}
+                    <div class="bg-brand-surface p-3.5 rounded-xl border border-brand-border">
+                        <span class="text-slate-500 uppercase tracking-wider text-[11px] font-bold block mb-1">Starring Cast</span>
+                        <span class="text-white font-medium">{{ series.cast }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Episodes Section -->
+        <div class="mt-14 pt-8 border-t border-brand-border">
+            
+            <!-- Season Selector Navigation Tabs -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div class="flex items-center space-x-3">
+                    <h2 class="text-xl sm:text-2xl font-bold text-white flex items-center space-x-2">
+                        <i data-lucide="layers" class="w-6 h-6 text-brand-red"></i>
+                        <span>Episodes</span>
+                    </h2>
+                    <span class="text-sm text-slate-400">({{ episodes|length }} in Season {{ active_season }})</span>
+                </div>
+
+                <!-- Season Tabs Pills -->
+                {% if seasons and seasons|length > 1 %}
+                <div class="flex items-center space-x-2 overflow-x-auto pb-1">
+                    {% for s in seasons %}
+                    <a href="/series/{{ series.id }}?season={{ s }}" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition whitespace-nowrap {% if s == active_season %}bg-brand-red text-black border-brand-red shadow-lg shadow-brand-red/20{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500 hover:text-white{% endif %}">
+                        Season {{ s }}
+                    </a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Episodes Grid / List -->
+            {% if episodes %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {% for ep in episodes %}
+                {% set prog = episode_progress.get(ep.id) %}
+                <div class="bg-brand-surface/70 hover:bg-brand-surface border border-brand-border hover:border-slate-600 rounded-2xl overflow-hidden transition-all duration-200 group flex flex-col justify-between shadow-md hover:shadow-xl">
+                    
+                    <div>
+                        <!-- Episode Still / Thumbnail with Play Hover -->
+                        <a href="/watch/episode/{{ ep.id }}" class="block relative aspect-video w-full overflow-hidden bg-slate-900 cursor-pointer">
+                            <img src="{{ ep.still_path or series.backdrop_path or series.poster_path }}" alt="{{ ep.title }}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                            
+                            <!-- Dark Overlay on Hover with Play Icon -->
+                            <div class="absolute inset-0 bg-black/40 group-hover:bg-black/20 flex items-center justify-center transition-all">
+                                <div class="w-12 h-12 rounded-full bg-brand-red/90 text-black flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition">
+                                    <i data-lucide="play" class="w-6 h-6 fill-current ml-0.5"></i>
+                                </div>
+                            </div>
+
+                            <!-- Season & Episode Badge -->
+                            <div class="absolute top-2.5 left-2.5">
+                                <span class="bg-black/80 backdrop-blur-md border border-white/20 text-white text-[11px] font-extrabold px-2 py-0.5 rounded-md">
+                                    S{{ "%02d"|format(ep.season_number) }}E{{ "%02d"|format(ep.episode_number) }}
+                                </span>
+                            </div>
+
+                            {% if ep.duration %}
+                            <div class="absolute bottom-2.5 right-2.5">
+                                <span class="bg-black/80 backdrop-blur-md text-slate-300 text-[10px] font-semibold px-2 py-0.5 rounded">
+                                    {{ ep.duration }}m
+                                </span>
+                            </div>
+                            {% endif %}
+
+                            <!-- Progress Bar along bottom -->
+                            {% if prog and prog.percent > 0 %}
+                            <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/80">
+                                <div class="h-full bg-brand-red" style="width: {{ prog.percent }}%;"></div>
+                            </div>
+                            {% endif %}
+                        </a>
+
+                        <!-- Episode Details Content -->
+                        <div class="p-4 space-y-2">
+                            <div class="flex items-start justify-between gap-2">
+                                <a href="/watch/episode/{{ ep.id }}" class="text-sm sm:text-base font-bold text-white group-hover:text-brand-red transition line-clamp-1" title="{{ ep.title or ('Episode ' ~ ep.episode_number) }}">
+                                    {{ ep.episode_number }}. {{ ep.title or ('Episode ' ~ ep.episode_number) }}
+                                </a>
+                            </div>
+
+                            <div class="flex items-center space-x-2 text-[11px] text-slate-400">
+                                {% if ep.resolution %}
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-semibold text-slate-300">{{ ep.resolution }}</span>
+                                {% endif %}
+                                {% if ep.codec %}
+                                <span class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 font-semibold text-slate-300">{{ ep.codec }}</span>
+                                {% endif %}
+                                {% if ep.air_date %}
+                                <span>{{ ep.air_date }}</span>
+                                {% endif %}
+                            </div>
+
+                            {% if ep.overview %}
+                            <p class="text-xs text-slate-300 line-clamp-3 leading-relaxed pt-1">
+                                {{ ep.overview }}
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Card Bottom Action -->
+                    <div class="p-4 pt-0 mt-2 flex items-center justify-between border-t border-brand-border/40 pt-3">
+                        <div class="text-[11px] text-slate-400 truncate max-w-[65%]" title="{{ ep.file_name }}">
+                            {{ ep.file_name }}
+                        </div>
+                        <a href="/watch/episode/{{ ep.id }}" class="bg-slate-800 hover:bg-brand-red hover:text-black text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 transition">
+                            <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+                            <span>{% if prog and prog.percent > 0 and not prog.completed %}Resume{% else %}Play{% endif %}</span>
+                        </a>
+                    </div>
+
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-12 bg-brand-surface/40 rounded-2xl border border-brand-border">
+                <i data-lucide="film" class="w-10 h-10 text-slate-500 mx-auto mb-2"></i>
+                <h3 class="text-base font-bold text-white">No episodes found for Season {{ active_season }}</h3>
+                <p class="text-xs text-slate-400 mt-1">Select another season from the selector above.</p>
+            </div>
+            {% endif %}
+
+        </div>
+
+    </div>
+</div>
+{% endblock %}

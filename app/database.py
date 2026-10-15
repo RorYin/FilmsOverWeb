@@ -200,6 +200,8 @@ class JsonDatabase:
             "users": [],
             "drive_folders": [],
             "movies": [],
+            "series": [],
+            "episodes": [],
             "system_settings": [],
             "watch_progress": []
         }
@@ -311,6 +313,10 @@ class JsonDatabase:
             if obj not in col:
                 col.append(obj)
 
+    def add_all(self, objs):
+        for obj in objs:
+            self.add(obj)
+
     def delete(self, obj):
         with self.lock:
             table_name = getattr(obj, "__tablename__", obj.__class__.__name__.lower() + "s")
@@ -323,12 +329,20 @@ class JsonDatabase:
             if table_name == "drive_folders":
                 movie_col = self.collections.get("movies", [])
                 self.collections["movies"] = [m for m in movie_col if getattr(m, "folder_id", None) != obj.id]
+                ep_col = self.collections.get("episodes", [])
+                self.collections["episodes"] = [e for e in ep_col if getattr(e, "folder_id", None) != obj.id]
             elif table_name == "users":
                 wp_col = self.collections.get("watch_progress", [])
                 self.collections["watch_progress"] = [p for p in wp_col if getattr(p, "user_id", None) != obj.id]
             elif table_name == "movies":
                 wp_col = self.collections.get("watch_progress", [])
                 self.collections["watch_progress"] = [p for p in wp_col if getattr(p, "movie_id", None) != obj.id]
+            elif table_name == "series":
+                ep_col = self.collections.get("episodes", [])
+                self.collections["episodes"] = [e for e in ep_col if getattr(e, "series_id", None) != obj.id]
+            elif table_name == "episodes":
+                wp_col = self.collections.get("watch_progress", [])
+                self.collections["watch_progress"] = [p for p in wp_col if getattr(p, "episode_id", None) != obj.id]
 
 class JsonQuery:
     def __init__(self, db, model_cls, items=None):
@@ -352,7 +366,11 @@ class JsonQuery:
             def sort_key(item):
                 val = getattr(item, field_name, None)
                 if val is None:
-                    return (1, "") if is_desc else (-1, "")
+                    return (1, 0) if is_desc else (-1, 0)
+                if isinstance(val, datetime):
+                    if val.tzinfo is not None:
+                        val = val.astimezone(timezone.utc).replace(tzinfo=None)
+                    return (0, val.timestamp())
                 return (0, val)
 
             sorted_items.sort(key=sort_key, reverse=is_desc)
@@ -382,6 +400,9 @@ class JsonSession:
 
     def add(self, obj):
         self.db.add(obj)
+
+    def add_all(self, objs):
+        self.db.add_all(objs)
 
     def delete(self, obj):
         self.db.delete(obj)

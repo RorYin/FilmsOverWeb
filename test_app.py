@@ -217,5 +217,190 @@ class TestFilmsOverWeb(unittest.TestCase):
                 db.commit()
             db.close()
 
+    def test_08_episode_parser(self):
+        from app.parser import parse_episode_info
+
+        # 1. Standard Season folder + episode file
+        info1 = parse_episode_info("S01E01.Pilot.1080p.HEVC.mkv", ["Breaking Bad", "Season 01"])
+        self.assertIsNotNone(info1)
+        self.assertEqual(info1["series_title"], "Breaking Bad")
+        self.assertEqual(info1["season_number"], 1)
+        self.assertEqual(info1["episode_number"], 1)
+        self.assertEqual(info1["codec"], "HEVC")
+        self.assertEqual(info1["resolution"], "1080p")
+
+        # 2. Episode in Series folder with title in filename
+        info2 = parse_episode_info("Stranger.Things.S04E02.Chapter.Two.mp4", ["Stranger Things"])
+        self.assertIsNotNone(info2)
+        self.assertEqual(info2["series_title"], "Stranger Things")
+        self.assertEqual(info2["season_number"], 4)
+        self.assertEqual(info2["episode_number"], 2)
+
+        # 3. 1x05 pattern
+        info3 = parse_episode_info("Dark.2x05.720p.mkv", [])
+        self.assertIsNotNone(info3)
+        self.assertEqual(info3["series_title"], "Dark")
+        self.assertEqual(info3["season_number"], 2)
+        self.assertEqual(info3["episode_number"], 5)
+
+        # 4. Standard Movie file must NOT be parsed as an episode
+        info4 = parse_episode_info("Interstellar.2014.1080p.mkv", ["Movies"])
+        self.assertIsNone(info4)
+
+    def test_09_series_models_and_routes(self):
+        from app.models import Series, Episode
+        from app.auth import create_access_token
+
+        db = SessionLocal()
+        # Clean up any existing test series
+        existing = db.query(Series).filter(Series.title == "Test Breaking Bad").first()
+        if existing:
+            for ep in existing.episodes:
+                db.delete(ep)
+            db.delete(existing)
+            db.commit()
+
+        # Ensure admin can browse without first-time change password redirect
+        admin_user = db.query(User).filter(User.role == "superadmin").first()
+        if admin_user:
+            admin_user.must_change_password = False
+            db.commit()
+
+        # Create test series
+        series = Series(
+            title="Test Breaking Bad",
+            overview="A chemistry teacher turned manufacturer.",
+            genres="Drama, Crime",
+            year=2008,
+            rating=9.5,
+            poster_path="/static/img/poster_placeholder.png"
+        )
+        db.add(series)
+        db.commit()
+
+        ep1 = Episode(
+            series_id=series.id,
+            season_number=1,
+            episode_number=1,
+            title="Pilot",
+            overview="Walter White gets diagnosed.",
+            file_name="Breaking.Bad.S01E01.Pilot.mkv",
+            file_size=1048576000,
+            gdrive_file_id="gdrive_fake_test_id_ep1",
+            resolution="1080p",
+            codec="HEVC"
+        )
+        ep2 = Episode(
+            series_id=series.id,
+            season_number=1,
+            episode_number=2,
+            title="Cat's in the Bag...",
+            overview="Walt and Jesse clean up.",
+            file_name="Breaking.Bad.S01E02.mkv",
+            file_size=1048576000,
+            gdrive_file_id="gdrive_fake_test_id_ep2",
+            resolution="1080p",
+            codec="HEVC"
+        )
+        db.add_all([ep1, ep2])
+        db.commit()
+
+        series_id = series.id
+        ep1_id = ep1.id
+        ep2_id = ep2.id
+
+        # Verify model relationships
+        self.assertEqual(series.seasons, [1])
+        self.assertEqual(len(series.episodes), 2)
+        self.assertEqual(ep1.series.id, series_id)
+
+        db.close()
+
+        # Login admin client
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={
+            "email": "test@gmail.com",
+            "password": "1q2w3e4r5t",
+            "next": "/"
+        })
+
+        # Test Browse Series page
+        series_resp = admin_client.get("/series")
+        self.assertEqual(series_resp.status_code, 200)
+        self.assertIn(b"TV Shows & Web Series", series_resp.content)
+        self.assertIn(b"Test Breaking Bad", series_resp.content)
+
+        # Test Series Detail page
+        detail_resp = admin_client.get(f"/series/{series_id}")
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertIn(b"Test Breaking Bad", detail_resp.content)
+        self.assertIn(b"Pilot", detail_resp.content)
+        self.assertTrue(b"Cat&#39;s in the Bag..." in detail_resp.content or b"Cat's in the Bag..." in detail_resp.content)
+
+        # Test Watch Episode Player page
+        watch_resp = admin_client.get(f"/watch/episode/{ep1_id}")
+        self.assertEqual(watch_resp.status_code, 200)
+        self.assertIn(b"movi-player", watch_resp.content)
+        self.assertIn(b"Next Ep", watch_resp.content)
+        self.assertIn(f"/watch/episode/{ep2_id}".encode(), watch_resp.content)
+
+    def test_10_episode_progress_and_home_rendering(self):
+        from app.models import Series, Episode, WatchProgress
+
+        db = SessionLocal()
+        series = db.query(Series).filter(Series.title == "Test Breaking Bad").first()
+        self.assertIsNotNone(series)
+        ep1 = series.episodes[0]
+        ep1_id = ep1.id
+        db.close()
+
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={
+            "email": "test@gmail.com",
+            "password": "1q2w3e4r5t",
+            "next": "/"
+        })
+
+        # Report progress
+        prog_resp = admin_client.post(f"/api/episodes/{ep1_id}/progress", json={
+            "position": 350.0,
+            "duration": 3400.0
+        })
+        self.assertEqual(prog_resp.status_code, 200)
+        self.assertEqual(prog_resp.json()["status"], "ok")
+
+        # Verify progress saved in database
+        db = SessionLocal()
+        admin_user = db.query(User).filter(User.email == "test@gmail.com").first()
+        prog = db.query(WatchProgress).filter(
+            WatchProgress.user_id == admin_user.id,
+            WatchProgress.episode_id == ep1_id
+        ).first()
+        self.assertIsNotNone(prog)
+        self.assertAlmostEqual(prog.position_seconds, 350.0)
+        self.assertTrue(prog.is_episode)
+        db.close()
+
+        # Verify Home page displays episode in Continue Watching and series in Web Series rail
+        home_resp = admin_client.get("/")
+        self.assertEqual(home_resp.status_code, 200)
+        self.assertIn(b"Continue Watching", home_resp.content)
+        self.assertIn(b"Web Series & TV Shows", home_resp.content)
+        self.assertIn(b"Test Breaking Bad", home_resp.content)
+
+        # Clean up test series, episodes, and watch progress
+        db = SessionLocal()
+        s = db.query(Series).filter(Series.title == "Test Breaking Bad").first()
+        if s:
+            for ep in s.episodes:
+                wps = db.query(WatchProgress).filter(WatchProgress.episode_id == ep.id).all()
+                for wp in wps:
+                    db.delete(wp)
+                db.delete(ep)
+            db.delete(s)
+            db.commit()
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
+

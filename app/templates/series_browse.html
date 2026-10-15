@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Explore TV Shows & Web Series - FilmsOverWeb{% endblock %}
+
+{% block content %}
+<div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Header & Search -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-brand-border">
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white flex items-center space-x-2">
+                <i data-lucide="tv" class="w-7 h-7 text-brand-red"></i>
+                <span>TV Shows & Web Series</span>
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                Showing {{ series_list|length }} series from connected Google Drive folders
+            </p>
+        </div>
+
+        <!-- Filter & Search Controls -->
+        <form method="GET" action="/series" class="flex flex-wrap items-center gap-3">
+            <!-- Search Query -->
+            <div class="relative">
+                <input type="text" name="q" placeholder="Filter series, cast..." value="{{ search_query or '' }}" class="bg-brand-surface border border-brand-border text-sm text-slate-200 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:border-brand-red w-48 sm:w-60">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-2.5 top-3"></i>
+            </div>
+
+            <!-- Sort By -->
+            <select name="sort" onchange="this.form.submit()" class="bg-brand-surface border border-brand-border text-xs sm:text-sm text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-brand-red cursor-pointer">
+                <option value="newest" {% if active_sort == 'newest' %}selected{% endif %}>Recently Added</option>
+                <option value="rating" {% if active_sort == 'rating' %}selected{% endif %}>Highest Rated</option>
+                <option value="year" {% if active_sort == 'year' %}selected{% endif %}>Release Year</option>
+                <option value="title" {% if active_sort == 'title' %}selected{% endif %}>Title (A-Z)</option>
+            </select>
+
+            {% if active_genre %}
+            <input type="hidden" name="genre" value="{{ active_genre }}">
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Genres Filter Bar -->
+    {% if genres %}
+    <div class="py-4">
+        <div class="flex items-center space-x-2 overflow-x-auto pb-2 text-xs">
+            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[11px] mr-1">Genres:</span>
+            <a href="/series?{% if search_query %}q={{ search_query }}&{% endif %}sort={{ active_sort }}" class="px-3 py-1 rounded-full border transition {% if not active_genre %}bg-brand-red text-black border-brand-red font-extrabold{% else %}bg-brand-surface text-slate-400 border-brand-border hover:border-slate-500{% endif %}">
+                All
+            </a>
+            {% for g in genres %}
+            <a href="/series?genre={{ g }}&{% if search_query %}q={{ search_query }}&{% endif %}sort={{ active_sort }}" class="px-3 py-1 rounded-full border whitespace-nowrap transition {% if active_genre == g %}bg-brand-blue text-white border-brand-blue font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+                {{ g }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Series Grid -->
+    {% if series_list %}
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 pt-4">
+        {% for series in series_list %}
+            {% include "components/series_card.html" %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-20 bg-brand-surface/40 rounded-2xl border border-brand-border my-6">
+        <i data-lucide="tv-2" class="w-12 h-12 text-slate-500 mx-auto mb-3"></i>
+        <h3 class="text-lg font-bold text-white">No TV Shows Found</h3>
+        <p class="text-sm text-slate-400 max-w-md mx-auto mt-1 mb-4">
+            Try adjusting your search query or connect a Google Drive folder containing TV series subfolders.
+        </p>
+        <a href="/series" class="inline-block bg-slate-800 text-slate-200 border border-slate-700 px-4 py-2 rounded-lg text-xs font-semibold hover:bg-slate-700 transition">
+            Reset All Filters
+        </a>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

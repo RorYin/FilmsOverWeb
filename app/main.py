@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse, Response
 from app.database import engine, Base, SessionLocal
 from app.auth import init_default_users
-from app.routes import auth_routes, movie_routes, stream_routes, admin_routes, superadmin_routes
+from app.routes import auth_routes, movie_routes, series_routes, stream_routes, admin_routes, superadmin_routes
 
 import asyncio
 from app.config import settings
@@ -76,6 +76,7 @@ async def head_root():
 # Mount Routers
 app.include_router(auth_routes.router)
 app.include_router(movie_routes.router)
+app.include_router(series_routes.router)
 app.include_router(stream_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(superadmin_routes.router)

@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 from app.database import get_db, desc, Session
-from app.models import Movie, WatchProgress, User
+from app.models import Movie, Series, Episode, WatchProgress, User
 from app.auth import get_current_user
 
 router = APIRouter(tags=["Movies & Library"])
@@ -88,7 +88,7 @@ async def home_library(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    # Continue Watching
+    # Continue Watching (supports both movies and TV episodes)
     continue_watching_records = db.query(WatchProgress).filter(
         WatchProgress.user_id == user.id,
         WatchProgress.completed == False,
@@ -97,17 +97,42 @@ async def home_library(
 
     continue_watching = []
     for cw in continue_watching_records:
-        if cw.movie:
+        if cw.is_episode and cw.episode:
+            ep = cw.episode
+            ser = ep.series
+            series_title = ser.title if ser else "TV Series"
             percent = int((cw.position_seconds / cw.duration_seconds) * 100) if cw.duration_seconds > 0 else 0
             continue_watching.append({
+                "is_episode": True,
+                "episode": ep,
+                "series": ser,
+                "title": f"{series_title} - S{ep.season_number:02d}E{ep.episode_number:02d}",
+                "subtitle": ep.title or f"Episode {ep.episode_number}",
+                "watch_url": f"/watch/episode/{ep.id}",
+                "poster_path": ep.still_path or (ser.poster_path if ser else None),
+                "progress_percent": min(percent, 100),
+                "position_seconds": cw.position_seconds
+            })
+        elif cw.movie:
+            percent = int((cw.position_seconds / cw.duration_seconds) * 100) if cw.duration_seconds > 0 else 0
+            continue_watching.append({
+                "is_episode": False,
                 "movie": cw.movie,
+                "title": cw.movie.title,
+                "subtitle": f"{cw.movie.year}" if cw.movie.year else "",
+                "watch_url": f"/watch/{cw.movie.id}",
+                "poster_path": cw.movie.poster_path,
                 "progress_percent": min(percent, 100),
                 "position_seconds": cw.position_seconds
             })
 
-    # Recently Added (deduplicated by title/TMDB)
+    # Recently Added Movies (deduplicated by title/TMDB)
     all_recent = deduplicate_movies(db.query(Movie).order_by(desc(Movie.created_at)).all())
     recently_added = all_recent[:15]
+
+    # Recently Added TV Series
+    all_series = db.query(Series).order_by(desc(Series.created_at)).all()
+    recent_series = all_series[:15]
 
     # Top 10 recently added movies for rotating Hero Billboard (prefer movies with backdrop/poster)
     hero_movies = [m for m in all_recent if (m.backdrop_path or m.poster_path)][:10]
@@ -123,7 +148,8 @@ async def home_library(
             "hero_movie": hero_movie,
             "hero_movies": hero_movies,
             "continue_watching": continue_watching,
-            "recently_added": recently_added
+            "recently_added": recently_added,
+            "recent_series": recent_series
         }
     )
 

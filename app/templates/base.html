@@ -54,11 +54,14 @@
                         <span class="text-white">FILMS<span class="text-brand-red">OVER</span>WEB</span>
                     </a>
                     
-                    <!-- Main Navigation Links: Only Library & Recently Added -->
+                    <!-- Main Navigation Links: Movies, TV Shows & Recently Added -->
                     {% if user %}
                     <div class="hidden md:flex items-center space-x-2 text-sm font-medium">
                         <a href="/movies" class="px-3.5 py-1.5 rounded-xl transition {% if request.url.path == '/movies' and not request.query_params.get('sort') %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
-                            Library
+                            Movies
+                        </a>
+                        <a href="/series" class="px-3.5 py-1.5 rounded-xl transition {% if request.url.path.startswith('/series') %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
+                            TV Shows
                         </a>
                         <a href="/movies?sort=newest" class="px-3.5 py-1.5 rounded-xl transition {% if request.query_params.get('sort') == 'newest' %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
                             Recently Added
@@ -89,7 +92,7 @@
                             <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
                         </button>
                         
-                        <!-- Dropdown Menu with Home, Library, and Admin Options -->
+                        <!-- Dropdown Menu with Home, Library, TV Shows and Admin Options -->
                         <div class="absolute right-0 mt-2 w-56 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl py-2 hidden group-hover:block transition-all z-50 backdrop-blur-xl">
                             <div class="px-4 py-2 border-b border-brand-border text-xs text-slate-400">
                                 Signed in as<br>
@@ -103,7 +106,11 @@
                                 </a>
                                 <a href="/movies" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
                                     <i data-lucide="film" class="w-4 h-4 text-slate-400"></i>
-                                    <span>Browse Library</span>
+                                    <span>Movies</span>
+                                </a>
+                                <a href="/series" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
+                                    <i data-lucide="tv" class="w-4 h-4 text-amber-400"></i>
+                                    <span>TV Shows & Series</span>
                                 </a>
                             </div>
 

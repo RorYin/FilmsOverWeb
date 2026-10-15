@@ -6,7 +6,7 @@ import httpx
 from fastapi import APIRouter, Request, Depends, HTTPException, status, Response
 from fastapi.responses import StreamingResponse, JSONResponse
 from app.database import get_db, Session
-from app.models import Movie, User, WatchProgress
+from app.models import Movie, User, WatchProgress, Episode
 from app.auth import get_current_user, get_current_user_optional, create_access_token
 from app.gdrive import get_google_credentials_info, get_access_token, DRIVE_V3_FILES_URL
 
@@ -319,6 +319,61 @@ async def update_watch_progress(
         progress = WatchProgress(
             user_id=user.id,
             movie_id=movie_id,
+            position_seconds=position,
+            duration_seconds=duration,
+            completed=completed
+        )
+        db.add(progress)
+    else:
+        progress.position_seconds = position
+        progress.duration_seconds = duration
+        progress.completed = completed
+
+    db.commit()
+    return JSONResponse({"status": "ok", "completed": completed})
+
+@router.get("/stream/episode/raw/{episode_id}")
+async def stream_episode_raw(
+    episode_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user_optional)
+):
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    episode = db.query(Episode).filter(Episode.id == episode_id).first()
+    if not episode:
+        raise HTTPException(status_code=404, detail="Episode not found")
+
+    return await stream_gdrive_range(episode, request.headers.get("range"), db)
+
+@router.post("/api/episodes/{episode_id}/progress")
+async def update_episode_watch_progress(
+    episode_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """Save user's playback position for a TV series episode."""
+    data = await request.json()
+    position = float(data.get("position", 0.0))
+    duration = float(data.get("duration", 0.0))
+
+    if duration <= 0:
+        return JSONResponse({"status": "ignored"})
+
+    progress = db.query(WatchProgress).filter(
+        WatchProgress.user_id == user.id,
+        WatchProgress.episode_id == episode_id
+    ).first()
+
+    completed = (position / duration) >= 0.92 if duration > 0 else False
+
+    if not progress:
+        progress = WatchProgress(
+            user_id=user.id,
+            episode_id=episode_id,
             position_seconds=position,
             duration_seconds=duration,
             completed=completed
