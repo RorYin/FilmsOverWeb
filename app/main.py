@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse, FileResponse, Response
 from app.database import engine, Base, SessionLocal
 from app.auth import init_default_users
 from app.routes import auth_routes, movie_routes, stream_routes, admin_routes, superadmin_routes
@@ -62,6 +62,16 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return FileResponse("app/static/img/favicon.ico")
+
+# Health check endpoints for Render, cloud port scanners, and container probes
+@app.api_route("/health", methods=["GET", "HEAD"], include_in_schema=False)
+@app.api_route("/ping", methods=["GET", "HEAD"], include_in_schema=False)
+async def health_check():
+    return Response(content="ok", media_type="text/plain", status_code=200)
+
+@app.head("/", include_in_schema=False)
+async def head_root():
+    return Response(content="", media_type="text/html", status_code=200)
 
 # Mount Routers
 app.include_router(auth_routes.router)
