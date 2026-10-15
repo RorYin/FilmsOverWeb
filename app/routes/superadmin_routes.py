@@ -36,6 +36,8 @@ async def settings_view(
         "google_api_key": get_setting_val("google_api_key", db, ""),
         "google_service_account_json": get_setting_val("google_service_account_json", db, ""),
         "cloudflare_worker_url": get_setting_val("cloudflare_worker_url", db, settings.CLOUDFLARE_WORKER_URL),
+        "resend_api_key": get_setting_val("resend_api_key", db, getattr(settings, "RESEND_API_KEY", "")),
+        "resend_from_email": get_setting_val("resend_from_email", db, getattr(settings, "RESEND_FROM_EMAIL", "")),
         "smtp_host": get_setting_val("smtp_host", db, "smtp.gmail.com"),
         "smtp_port": get_setting_val("smtp_port", db, "465"),
         "smtp_user": get_setting_val("smtp_user", db, ""),
@@ -63,6 +65,8 @@ async def save_settings(
     google_api_key: str = Form(""),
     google_service_account_json: str = Form(""),
     cloudflare_worker_url: str = Form(""),
+    resend_api_key: str = Form(""),
+    resend_from_email: str = Form(""),
     smtp_host: str = Form("smtp.gmail.com"),
     smtp_port: str = Form("465"),
     smtp_user: str = Form(""),
@@ -75,6 +79,8 @@ async def save_settings(
     set_setting_val("google_api_key", google_api_key.strip(), db)
     set_setting_val("google_service_account_json", google_service_account_json.strip(), db)
     set_setting_val("cloudflare_worker_url", cloudflare_worker_url.strip().rstrip("/"), db)
+    set_setting_val("resend_api_key", resend_api_key.strip(), db)
+    set_setting_val("resend_from_email", resend_from_email.strip(), db)
     set_setting_val("smtp_host", smtp_host.strip(), db)
     set_setting_val("smtp_port", smtp_port.strip(), db)
     set_setting_val("smtp_user", smtp_user.strip(), db)
@@ -119,9 +125,12 @@ async def test_email(
         "tmdb_api_key": get_setting_val("tmdb_api_key", db, ""),
         "google_api_key": get_setting_val("google_api_key", db, ""),
         "google_service_account_json": get_setting_val("google_service_account_json", db, ""),
+        "cloudflare_worker_url": get_setting_val("cloudflare_worker_url", db, settings.CLOUDFLARE_WORKER_URL),
+        "resend_api_key": get_setting_val("resend_api_key", db, getattr(settings, "RESEND_API_KEY", "")),
+        "resend_from_email": get_setting_val("resend_from_email", db, getattr(settings, "RESEND_FROM_EMAIL", "")),
         "smtp_host": get_setting_val("smtp_host", db, "smtp.gmail.com"),
         "smtp_port": get_setting_val("smtp_port", db, "465"),
-        "smtp_user": get_setting_val("smtp_user", db, "drmnbot@gmail.com"),
+        "smtp_user": get_setting_val("smtp_user", db, ""),
         "smtp_password": get_setting_val("smtp_password", db, ""),
         "smtp_use_ssl": get_setting_val("smtp_use_ssl", db, "true")
     }

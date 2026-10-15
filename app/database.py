@@ -267,7 +267,23 @@ class JsonDatabase:
             tmp_path = self.filepath + ".tmp"
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, default=str)
-            os.replace(tmp_path, self.filepath)
+            
+            import time
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, self.filepath)
+                    break
+                except (PermissionError, OSError):
+                    if attempt == 4:
+                        try:
+                            with open(self.filepath, "w", encoding="utf-8") as f:
+                                json.dump(data, f, indent=2, default=str)
+                            if os.path.exists(tmp_path):
+                                os.remove(tmp_path)
+                        except Exception:
+                            pass
+                    else:
+                        time.sleep(0.05)
             try:
                 self._last_mtime = os.path.getmtime(self.filepath)
             except Exception:

@@ -426,6 +426,50 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertEqual(head_resp.headers.get("access-control-allow-origin"), "*")
         self.assertIn("Content-Range", head_resp.headers.get("access-control-expose-headers", ""))
 
+    def test_12_email_resend_and_port_block_handling(self):
+        from unittest.mock import patch, MagicMock
+        from app.mailer import send_guest_welcome_email, _dispatch_smtp_email
+        from email.mime.multipart import MIMEMultipart
+
+        # 1. Test Errno 101 friendly message
+        dummy_msg = MIMEMultipart()
+        cfg = {"host": "smtp.gmail.com", "port": 465, "use_ssl": True, "user": "test@gmail.com", "password": "apppassword1234"}
+        with patch("smtplib.SMTP_SSL", side_effect=OSError(101, "Network is unreachable")):
+            with patch("smtplib.SMTP", side_effect=OSError(101, "Network is unreachable")):
+                ok, msg = _dispatch_smtp_email("guest@example.com", dummy_msg, cfg)
+                self.assertFalse(ok)
+                self.assertIn("Render Free Tier blocks outbound SMTP traffic", msg)
+                self.assertIn("Resend API Key", msg)
+
+        # 2. Test Resend HTTPS API dispatch when resend_api_key is provided
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.text = '{"id": "re_12345"}'
+
+        db = SessionLocal()
+        from app.routes.superadmin_routes import set_setting_val
+        set_setting_val("resend_api_key", "re_test_key_12345", db)
+
+        with patch("httpx.post", return_value=mock_response) as mock_post:
+            ok, msg = send_guest_welcome_email(
+                guest_email="testguest@example.com",
+                guest_name="Test Guest",
+                password="TestPassWord!1",
+                login_url="http://localhost:8000/login",
+                db=db
+            )
+            self.assertTrue(ok)
+            self.assertIn("Resend HTTPS API", msg)
+            self.assertTrue(mock_post.called)
+            args, kwargs = mock_post.call_args
+            self.assertEqual(args[0], "https://api.resend.com/emails")
+            self.assertEqual(kwargs["json"]["to"], ["testguest@example.com"])
+            self.assertIn("Bearer re_test_key_12345", kwargs["headers"]["Authorization"])
+
+        # Clean up test setting
+        set_setting_val("resend_api_key", "", db)
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -67,20 +67,20 @@
             </div>
         </div>
 
-        <!-- Google Mail Automation Status -->
+        <!-- Email Automation Status -->
         {% if mail_status %}
         <div class="text-xs pt-1">
             {% if mail_status.success %}
             <div class="flex items-center space-x-2 text-emerald-400 font-medium">
                 <i data-lucide="send" class="w-4 h-4"></i>
-                <span>Google Mail Automation: {{ mail_status.message }}</span>
+                <span>Email Automation: {{ mail_status.message }}</span>
             </div>
             {% else %}
             <div class="flex items-start space-x-2 text-amber-300 bg-amber-500/10 p-3 rounded-lg border border-amber-500/20">
                 <i data-lucide="info" class="w-4 h-4 flex-none mt-0.5"></i>
-                <div>
-                    <span class="font-bold">Email dispatch notice:</span> {{ mail_status.message }}
-                    <span class="block text-slate-400 mt-1">You can share the credentials manually or configure the Gmail App Password under SuperAdmin Settings.</span>
+                <div class="space-y-1">
+                    <div><span class="font-bold">Email notice:</span> {{ mail_status.message }}</div>
+                    <span class="block text-slate-400">💡 <em>You can copy the credentials above and share them directly, or configure a free Resend API Key in <a href="/superadmin/settings" class="text-amber-400 underline hover:text-amber-300">SuperAdmin Settings</a> for automatic delivery over HTTPS Port 443.</em></span>
                 </div>
             </div>
             {% endif %}

@@ -28,10 +28,12 @@ def get_smtp_config(db: Optional[Session] = None) -> dict:
         "port": settings.SMTP_PORT,
         "user": settings.SMTP_USER,
         "password": settings.SMTP_PASSWORD,
-        "use_ssl": settings.SMTP_USE_SSL
+        "use_ssl": settings.SMTP_USE_SSL,
+        "resend_api_key": getattr(settings, "RESEND_API_KEY", ""),
+        "resend_from_email": getattr(settings, "RESEND_FROM_EMAIL", "")
     }
     if db:
-        for key in ["smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_use_ssl"]:
+        for key in ["smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_use_ssl", "resend_api_key", "resend_from_email"]:
             row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
             if row and row.value is not None and row.value.strip():
                 if key == "smtp_port":
@@ -41,10 +43,58 @@ def get_smtp_config(db: Optional[Session] = None) -> dict:
                         pass
                 elif key == "smtp_use_ssl":
                     config["use_ssl"] = row.value.strip().lower() in ("true", "1", "yes")
+                elif key in ("resend_api_key", "resend_from_email"):
+                    config[key] = row.value.strip()
                 else:
                     config[key.replace("smtp_", "")] = row.value.strip()
 
     return config
+
+def _dispatch_resend_email(
+    to_email: str,
+    subject: str,
+    text_content: str,
+    html_content: str,
+    cfg: dict
+) -> Tuple[bool, str]:
+    api_key = (cfg.get("resend_api_key") or "").strip()
+    from_email = (cfg.get("resend_from_email") or "").strip()
+    if not from_email:
+        # Default to Resend's free onboarding sender if not provided
+        from_email = "FilmsOverWeb <onboarding@resend.dev>"
+    elif "<" not in from_email:
+        from_email = f"FilmsOverWeb <{from_email}>"
+
+    try:
+        import httpx
+        resp = httpx.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": from_email,
+                "to": [to_email],
+                "subject": subject,
+                "html": html_content,
+                "text": text_content
+            },
+            timeout=15.0
+        )
+        if resp.status_code in (200, 201):
+            return True, "Email sent successfully via Resend HTTPS API (Port 443)."
+        else:
+            err_text = resp.text
+            try:
+                err_data = resp.json()
+                if isinstance(err_data, dict):
+                    err_text = err_data.get("message", err_text)
+            except Exception:
+                pass
+            return False, f"Resend API error ({resp.status_code}): {err_text}"
+    except Exception as e:
+        return False, f"Failed to connect to Resend API: {e}"
 
 def send_guest_welcome_email(
     guest_email: str,
@@ -55,17 +105,24 @@ def send_guest_welcome_email(
 ) -> Tuple[bool, str]:
     """
     Automates sending the welcome email with credentials to newly created guest accounts
-    using Google Mail SMTP.
+    using Resend HTTPS API or Google Mail SMTP.
     """
     cfg = get_smtp_config(db)
+    resend_key = (cfg.get("resend_api_key") or "").strip()
     sender = (cfg.get("user") or "").strip()
     password_smtp = (cfg.get("password") or "").strip().replace(" ", "")
 
-    if not sender:
-        return False, "Gmail Sender Email is not configured in SuperAdmin Settings yet. Please enter your email address in Settings."
-
-    if not password_smtp:
-        return False, "Google App Password is not configured in SuperAdmin Settings yet. Please generate one at https://myaccount.google.com/apppasswords and paste it in Settings."
+    if not resend_key:
+        if not sender and not password_smtp:
+            return False, (
+                "Email automation is not configured yet. "
+                "On Render Free Tier, please provide a free Resend API Key in SuperAdmin Settings (port 443 HTTPS). "
+                "Alternatively, if running locally or on a paid host, configure your Gmail address and Google App Password."
+            )
+        if not sender:
+            return False, "Gmail Sender Email is not configured in SuperAdmin Settings yet. Please enter your email address in Settings."
+        if not password_smtp:
+            return False, "Google App Password is not configured in SuperAdmin Settings yet. Please generate one at https://myaccount.google.com/apppasswords and paste it in Settings."
 
     subject = "🎬 Your FilmsOverWeb Access is Ready - Welcome to the Cinema"
     display_name = guest_name if guest_name else "Guest"
@@ -132,11 +189,6 @@ def send_guest_welcome_email(
     </html>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"FilmsOverWeb <{sender}>"
-    msg["To"] = guest_email
-
     text_content = f"""
 Hello {display_name},
 
@@ -149,6 +201,19 @@ Note: You will be prompted to set your own permanent password upon first login.
 Enjoy movies streamed directly from Google Drive in full quality with HEVC and AV1 support.
     """
 
+    if resend_key:
+        return _dispatch_resend_email(
+            to_email=guest_email,
+            subject=subject,
+            text_content=text_content,
+            html_content=html_content,
+            cfg=cfg
+        )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"FilmsOverWeb <{sender}>"
+    msg["To"] = guest_email
     msg.attach(MIMEText(text_content, "plain"))
     msg.attach(MIMEText(html_content, "html"))
 
@@ -166,14 +231,21 @@ def send_password_reset_email(
     When they log in, they will be required to change it.
     """
     cfg = get_smtp_config(db)
+    resend_key = (cfg.get("resend_api_key") or "").strip()
     sender = (cfg.get("user") or "").strip()
     password_smtp = (cfg.get("password") or "").strip().replace(" ", "")
 
-    if not sender:
-        return False, "Gmail Sender Email is not configured in SuperAdmin Settings yet. Please configure your email in Settings."
-
-    if not password_smtp:
-        return False, "Google App Password is not configured in SuperAdmin Settings. Please configure it to enable password reset emails."
+    if not resend_key:
+        if not sender and not password_smtp:
+            return False, (
+                "Email automation is not configured yet. "
+                "On Render Free Tier, please provide a free Resend API Key in SuperAdmin Settings (port 443 HTTPS). "
+                "Alternatively, if running locally or on a paid host, configure your Gmail address and Google App Password."
+            )
+        if not sender:
+            return False, "Gmail Sender Email is not configured in SuperAdmin Settings yet. Please configure your email in Settings."
+        if not password_smtp:
+            return False, "Google App Password is not configured in SuperAdmin Settings. Please configure it to enable password reset emails."
 
     subject = "🔑 FilmsOverWeb Password Reset - Temporary Credentials"
     display_name = user_name if user_name else "User"
@@ -232,11 +304,6 @@ def send_password_reset_email(
     </html>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"FilmsOverWeb <{sender}>"
-    msg["To"] = user_email
-
     text_content = f"""
 Hello {display_name},
 
@@ -249,6 +316,19 @@ When you sign in with this temporary password, you will be prompted to choose yo
 If you did not request this, please contact your administrator.
     """
 
+    if resend_key:
+        return _dispatch_resend_email(
+            to_email=user_email,
+            subject=subject,
+            text_content=text_content,
+            html_content=html_content,
+            cfg=cfg
+        )
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"FilmsOverWeb <{sender}>"
+    msg["To"] = user_email
     msg.attach(MIMEText(text_content, "plain"))
     msg.attach(MIMEText(html_content, "html"))
 
@@ -300,6 +380,13 @@ def _dispatch_smtp_email(to_email: str, msg: MIMEMultipart, cfg: dict, db: Optio
     except Exception as e:
         err_msg = str(e)
         print(f"[MAILER] Error sending email to {to_email}: {err_msg}")
+        if "101" in err_msg or "Network is unreachable" in err_msg:
+            return False, (
+                "[Errno 101] Network is unreachable. "
+                "Render Free Tier blocks outbound SMTP traffic on ports 25, 465, and 587. "
+                "To resolve this, enter a free Resend API Key in SuperAdmin Settings (which connects over HTTPS Port 443, never blocked), "
+                "or copy and share the credentials displayed on screen manually."
+            )
         if "535" in err_msg or "BadCredentials" in err_msg or "Username and Password not accepted" in err_msg:
             return False, (
                 "Gmail authentication rejected (535 Bad Credentials). "

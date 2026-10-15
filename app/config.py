@@ -43,7 +43,9 @@ class AppConfig(BaseModel):
     # Cloudflare Stream Worker (Option B: Zero-Bandwidth Direct Client Streaming)
     CLOUDFLARE_WORKER_URL: str = os.getenv("CLOUDFLARE_WORKER_URL", "")
 
-    # Gmail SMTP Automation Defaults
+    # Email Automation Defaults (Resend HTTPS API or Gmail SMTP)
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+    RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "")
     SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", "465"))
     SMTP_USER: str = os.getenv("SMTP_USER", "")
