@@ -10,8 +10,31 @@ from app.mailer import generate_secure_password, send_password_reset_email
 router = APIRouter(tags=["Authentication"])
 templates = Jinja2Templates(directory="app/templates")
 
+@router.get("/tv-login")
+async def tv_login(request: Request, db: Session = Depends(get_db)):
+    """One-click auto-login endpoint for Smart TVs (webOS/Tizen) using the guest account."""
+    user = db.query(User).filter(User.email == "guest@filmsoverweb.com").first()
+    if not user or not user.is_active:
+        from app.auth import init_default_users
+        init_default_users(db)
+        user = db.query(User).filter(User.email == "guest@filmsoverweb.com").first()
+
+    token = create_access_token({"sub": user.email, "role": user.role, "name": user.name})
+    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=token,
+        httponly=True,
+        max_age=60 * 60 * 24 * 30,  # 30 days session
+        samesite="lax",
+        secure=False
+    )
+    return response
+
 @router.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request, next: str = "/", db: Session = Depends(get_db)):
+async def login_page(request: Request, next: str = "/", auto: Optional[str] = None, db: Session = Depends(get_db)):
+    if auto == "guest":
+        return await tv_login(request, db)
     user = get_current_user_optional(request, db)
     if user:
         if user.must_change_password:

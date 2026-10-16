@@ -26,6 +26,18 @@
         </div>
         {% endif %}
 
+        <!-- Quick TV Login Button -->
+        <a href="/tv-login" class="w-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center space-x-2 text-sm mb-4">
+            <i data-lucide="tv" class="w-5 h-5 text-amber-400"></i>
+            <span>One-Click TV / Guest Access</span>
+        </a>
+
+        <div class="relative flex py-2 items-center mb-3">
+            <div class="flex-grow border-t border-brand-border"></div>
+            <span class="flex-shrink mx-4 text-slate-500 text-[11px] uppercase tracking-wider">Or Sign In Manually</span>
+            <div class="flex-grow border-t border-brand-border"></div>
+        </div>
+
         <!-- Login Form -->
         <form method="POST" action="/login" class="space-y-4">
             <input type="hidden" name="next" value="{{ next }}">
@@ -33,7 +45,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
                 <div class="relative">
-                    <input type="email" name="email" required placeholder="your.email@example.com" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
+                    <input type="email" name="email" value="guest@filmsoverweb.com" required placeholder="your.email@example.com" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
                     <i data-lucide="mail" class="w-4 h-4 text-slate-500 absolute left-3.5 top-3"></i>
                 </div>
             </div>
@@ -44,7 +56,7 @@
                     <a href="/forgot-password" class="text-xs text-amber-400 hover:text-amber-300 hover:underline transition">Forgot password?</a>
                 </div>
                 <div class="relative">
-                    <input type="password" name="password" required placeholder="••••••••••••" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
+                    <input type="password" name="password" value="guest@123" required placeholder="••••••••••••" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
                     <i data-lucide="lock" class="w-4 h-4 text-slate-500 absolute left-3.5 top-3"></i>
                 </div>
             </div>
