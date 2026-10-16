@@ -1,3 +1,4 @@
+import os
 import re
 import json
 import httpx
@@ -30,28 +31,54 @@ def extract_folder_id(input_str: str) -> Optional[str]:
     
     return None
 
+def _parse_service_account_json(sa_str: str) -> Optional[dict]:
+    if not sa_str or not sa_str.strip():
+        return None
+    cleaned = sa_str.strip()
+
+    # 1. Check if it's a file path to a JSON file
+    if (cleaned.endswith(".json") or os.path.exists(cleaned)) and os.path.isfile(cleaned):
+        try:
+            with open(cleaned, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[GDRIVE] Error loading service account JSON file '{cleaned}': {e}")
+
+    # 2. Try parsing directly as a JSON string
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        pass
+
+    # 3. Try base64 decoding (for single-line env vars on Render/Heroku)
+    try:
+        import base64
+        decoded = base64.b64decode(cleaned).decode("utf-8")
+        return json.loads(decoded)
+    except Exception:
+        pass
+
+    print("[GDRIVE] Warning: Could not parse Service Account JSON string or file path.")
+    return None
+
 def get_google_credentials_info(db: Optional[Session] = None) -> Tuple[Optional[str], Optional[dict]]:
     """
     Returns (api_key, service_account_info_dict)
+    Prioritizes DB setting if set and non-empty, otherwise falls back to environment variable in settings.
     """
     api_key = settings.GOOGLE_API_KEY
     sa_json_str = settings.GOOGLE_SERVICE_ACCOUNT_JSON
 
     if db:
         api_key_setting = db.query(SystemSetting).filter(SystemSetting.key == "google_api_key").first()
-        if api_key_setting and api_key_setting.value:
+        if api_key_setting and api_key_setting.value and api_key_setting.value.strip():
             api_key = api_key_setting.value.strip()
 
         sa_setting = db.query(SystemSetting).filter(SystemSetting.key == "google_service_account_json").first()
-        if sa_setting and sa_setting.value:
+        if sa_setting and sa_setting.value and sa_setting.value.strip():
             sa_json_str = sa_setting.value.strip()
 
-    sa_info = None
-    if sa_json_str:
-        try:
-            sa_info = json.loads(sa_json_str)
-        except Exception as e:
-            print(f"[GDRIVE] Error parsing service account JSON: {e}")
+    sa_info = _parse_service_account_json(sa_json_str) if sa_json_str else None
 
     return api_key, sa_info
 

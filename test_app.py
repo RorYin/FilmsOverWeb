@@ -492,6 +492,52 @@ class TestFilmsOverWeb(unittest.TestCase):
             self.assertEqual(resp.status_code, 429)
             self.assertIn("quota exceeded", resp.text.lower())
 
+    def test_14_google_credentials_from_env_and_override(self):
+        import json
+        from app.config import settings
+        from app.gdrive import get_google_credentials_info
+        from app.routes.superadmin_routes import get_setting_val, set_setting_val
+
+        db = SessionLocal()
+        # Clean existing test values in DB to test env fallback
+        set_setting_val("google_api_key", "", db)
+        set_setting_val("google_service_account_json", "", db)
+
+        sample_sa = json.dumps({"type": "service_account", "project_id": "env-test-project"})
+
+        old_api_key = settings.GOOGLE_API_KEY
+        old_sa_json = settings.GOOGLE_SERVICE_ACCOUNT_JSON
+
+        try:
+            settings.GOOGLE_API_KEY = "AIzaSyTestEnvKey123"
+            settings.GOOGLE_SERVICE_ACCOUNT_JSON = sample_sa
+
+            # 1. Verify get_google_credentials_info loads from settings env fallback when DB is empty
+            api_key, sa_info = get_google_credentials_info(db)
+            self.assertEqual(api_key, "AIzaSyTestEnvKey123")
+            self.assertIsNotNone(sa_info)
+            self.assertEqual(sa_info.get("project_id"), "env-test-project")
+
+            # 2. Verify superadmin settings view loads env default
+            admin_client = TestClient(app)
+            admin_client.post("/login", data={"email": "test@gmail.com", "password": "1q2w3e4r5t", "next": "/"})
+            res = admin_client.get("/superadmin/settings")
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("AIzaSyTestEnvKey123", res.text)
+            self.assertIn("env-test-project", res.text)
+
+            # 3. Verify user can override it later in the database
+            set_setting_val("google_api_key", "AIzaSyUserOverriddenKey", db)
+            api_key2, _ = get_google_credentials_info(db)
+            self.assertEqual(api_key2, "AIzaSyUserOverriddenKey")
+
+        finally:
+            settings.GOOGLE_API_KEY = old_api_key
+            settings.GOOGLE_SERVICE_ACCOUNT_JSON = old_sa_json
+            set_setting_val("google_api_key", "", db)
+            set_setting_val("google_service_account_json", "", db)
+            db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

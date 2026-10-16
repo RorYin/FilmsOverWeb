@@ -14,7 +14,9 @@ superadmin_only = require_role(["superadmin"])
 
 def get_setting_val(key: str, db: Session, default: str = "") -> str:
     row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
-    return row.value if row and row.value is not None else default
+    if row and row.value is not None and row.value.strip():
+        return row.value.strip()
+    return default
 
 def set_setting_val(key: str, val: str, db: Session):
     row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
@@ -32,17 +34,17 @@ async def settings_view(
     user: User = Depends(superadmin_only)
 ):
     current_settings = {
-        "tmdb_api_key": get_setting_val("tmdb_api_key", db, ""),
-        "google_api_key": get_setting_val("google_api_key", db, ""),
-        "google_service_account_json": get_setting_val("google_service_account_json", db, ""),
+        "tmdb_api_key": get_setting_val("tmdb_api_key", db, settings.TMDB_API_KEY),
+        "google_api_key": get_setting_val("google_api_key", db, settings.GOOGLE_API_KEY),
+        "google_service_account_json": get_setting_val("google_service_account_json", db, settings.GOOGLE_SERVICE_ACCOUNT_JSON),
         "cloudflare_worker_url": get_setting_val("cloudflare_worker_url", db, settings.CLOUDFLARE_WORKER_URL),
         "resend_api_key": get_setting_val("resend_api_key", db, getattr(settings, "RESEND_API_KEY", "")),
         "resend_from_email": get_setting_val("resend_from_email", db, getattr(settings, "RESEND_FROM_EMAIL", "")),
-        "smtp_host": get_setting_val("smtp_host", db, "smtp.gmail.com"),
-        "smtp_port": get_setting_val("smtp_port", db, "465"),
-        "smtp_user": get_setting_val("smtp_user", db, ""),
-        "smtp_password": get_setting_val("smtp_password", db, ""),
-        "smtp_use_ssl": get_setting_val("smtp_use_ssl", db, "true")
+        "smtp_host": get_setting_val("smtp_host", db, getattr(settings, "SMTP_HOST", "smtp.gmail.com")),
+        "smtp_port": get_setting_val("smtp_port", db, str(getattr(settings, "SMTP_PORT", 465))),
+        "smtp_user": get_setting_val("smtp_user", db, getattr(settings, "SMTP_USER", "")),
+        "smtp_password": get_setting_val("smtp_password", db, getattr(settings, "SMTP_PASSWORD", "")),
+        "smtp_use_ssl": get_setting_val("smtp_use_ssl", db, "true" if getattr(settings, "SMTP_USE_SSL", True) else "false")
     }
     return templates.TemplateResponse(
         request=request,

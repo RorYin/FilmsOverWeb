@@ -106,15 +106,21 @@
 
             <div class="grid grid-cols-1 gap-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Google API Key (For Public / Shared Folders)</label>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Google API Key (For Public / Shared Folders)</span>
+                        <span class="text-[10px] text-slate-500 font-normal">Env: <code>GOOGLE_API_KEY</code></span>
+                    </label>
                     <input type="text" name="google_api_key" value="{{ settings.google_api_key }}" placeholder="AIzaSy..." class="w-full bg-slate-900 border border-brand-border focus:border-brand-blue text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
-                    <p class="text-[11px] text-slate-500 mt-1">Required if you are indexing folders shared with "Anyone with the link can view".</p>
+                    <p class="text-[11px] text-slate-500 mt-1">Automatically loaded from <code>GOOGLE_API_KEY</code> environment variable if set. You can edit or override it here anytime.</p>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Google Service Account JSON (For Private / Team Drives)</label>
+                    <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                        <span>Google Service Account JSON (For Private / Team Drives)</span>
+                        <span class="text-[10px] text-slate-500 font-normal">Env: <code>GOOGLE_SERVICE_ACCOUNT_JSON</code></span>
+                    </label>
                     <textarea name="google_service_account_json" rows="4" placeholder='{"type": "service_account", "project_id": "...", "private_key": "..."}' class="w-full bg-slate-900 border border-brand-border focus:border-brand-blue text-slate-200 text-xs rounded-xl p-3 outline-none font-mono transition">{{ settings.google_service_account_json }}</textarea>
-                    <p class="text-[11px] text-slate-500 mt-1">Recommended for high reliability: paste your Google Cloud Service Account JSON key.</p>
+                    <p class="text-[11px] text-slate-500 mt-1">Automatically loaded from <code>GOOGLE_SERVICE_ACCOUNT_JSON</code> environment variable (raw JSON, file path, or base64) if set. You can edit or override it here anytime.</p>
                 </div>
             </div>
         </div>

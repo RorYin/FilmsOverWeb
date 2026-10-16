@@ -143,6 +143,9 @@ git push origin main
 5. Under **Advanced → Environment Variables**, add:
    - `SECRET_KEY`: *(Generate a secure random string)*
    - `TMDB_API_KEY`: *(Your TMDB API Key)*
+   - `GOOGLE_API_KEY`: *(Optional: Google API Key for public drive streaming)*
+   - `GOOGLE_SERVICE_ACCOUNT_JSON`: *(Recommended: Paste Service Account JSON content or base64 to bypass 24h quotas)*
+   - `CLOUDFLARE_WORKER_URL`: *(Optional: Your Cloudflare Worker URL for 0-bandwidth streaming)*
    - `SuperAdminEmail`: *(Optional: Custom SuperAdmin email - if set, password change prompt is bypassed)*
    - `SuperAdminPassword`: *(Optional: Custom SuperAdmin password)*
    - *(Note: If SuperAdminEmail and SuperAdminPassword are omitted, it rolls over to test@gmail.com / 1q2w3e4r5t with a first-time password change prompt)*

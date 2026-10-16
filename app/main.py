@@ -40,6 +40,32 @@ async def init_default_folders(db: SessionLocal):
             print(f"[STARTUP] Registered Google Drive folder: {folder.folder_name} ({folder_id})")
             asyncio.create_task(perform_sync_folder(folder.id, SessionLocal))
 
+def init_default_settings(db: SessionLocal):
+    """Sync environment variables into system_settings if not already set or empty in DB."""
+    from app.models import SystemSetting
+    env_keys = {
+        "google_api_key": settings.GOOGLE_API_KEY,
+        "google_service_account_json": settings.GOOGLE_SERVICE_ACCOUNT_JSON,
+        "tmdb_api_key": settings.TMDB_API_KEY,
+        "cloudflare_worker_url": settings.CLOUDFLARE_WORKER_URL,
+        "resend_api_key": getattr(settings, "RESEND_API_KEY", ""),
+        "resend_from_email": getattr(settings, "RESEND_FROM_EMAIL", ""),
+        "smtp_user": getattr(settings, "SMTP_USER", ""),
+        "smtp_password": getattr(settings, "SMTP_PASSWORD", ""),
+    }
+    updated = False
+    for key, val in env_keys.items():
+        if val and val.strip():
+            row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
+            if not row:
+                db.add(SystemSetting(key=key, value=val.strip()))
+                updated = True
+            elif not row.value or not row.value.strip():
+                row.value = val.strip()
+                updated = True
+    if updated:
+        db.commit()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: ensure tables exist, default users and default Google Drive folder are configured
@@ -47,6 +73,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         init_default_users(db)
+        init_default_settings(db)
         await init_default_folders(db)
         from app.tmdb import enrich_all_missing_movies
         asyncio.create_task(enrich_all_missing_movies(SessionLocal))
