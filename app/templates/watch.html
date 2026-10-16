@@ -17,7 +17,7 @@
     <div class="w-[90%] max-w-[1850px] mx-auto px-3 sm:px-6 lg:px-8 space-y-4">
         
         <!-- Clean Cinema Navigation -->
-        <div class="flex items-center justify-between bg-brand-surface/80 border border-brand-border px-4 py-3 rounded-2xl backdrop-blur shadow-md">
+        <div class="relative z-30 flex items-center justify-between bg-brand-surface/80 border border-brand-border px-4 py-3 rounded-2xl backdrop-blur shadow-md">
             <div class="flex items-center space-x-3">
                 <a href="/movie/{{ movie.id }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl transition" title="Back to Movie Details">
                     <i data-lucide="arrow-left" class="w-5 h-5"></i>
@@ -132,7 +132,7 @@
         </div>
 
         <!-- Video Player Container (WebCodecs GPU + Native Hardware Fallback) -->
-        <div id="player-container" class="relative bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl aspect-video">
+        <div id="player-container" class="relative z-10 bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl aspect-video">
             <!-- WebCodecs Hardware-Accelerated Player (sw="false" prevents CPU software fallback lag) -->
             <movi-player id="movi-player"
                          src=""
