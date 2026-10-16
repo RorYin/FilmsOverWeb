@@ -74,11 +74,90 @@ export default {
       gdriveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`;
     }
 
-    // 4. Forward client Range header for chunked seeking
+    // Determine target MIME type from filename
+    const fileName = (url.searchParams.get("name") || "").toLowerCase();
+    let defaultMime = "video/mp4";
+    if (fileName.endsWith(".mkv")) {
+      defaultMime = "video/x-matroska";
+    } else if (fileName.endsWith(".webm")) {
+      defaultMime = "video/webm";
+    }
+
+    // 4. Handle HEAD probes (used by movi-player WASM player to check size & range support)
+    // Google Drive returns Content-Length: 0 on un-ranged HEAD requests.
+    // Probing with Range: bytes=0-0 forces Google to return Content-Range: bytes 0-0/{totalSize}.
+    if (request.method === "HEAD") {
+      try {
+        const probeHeaders = new Headers({
+          "Range": "bytes=0-0",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        });
+        const probeResp = await fetch(gdriveUrl, {
+          method: "GET",
+          headers: probeHeaders,
+          redirect: "follow",
+          cf: { cacheEverything: true, cacheTtl: 86400 }
+        });
+
+        const probeCt = probeResp.headers.get("Content-Type") || "";
+        if (probeCt.includes("text/html")) {
+          return new Response(
+            JSON.stringify({
+              error: "Google Drive Quota Exceeded",
+              details: "Google Drive has temporarily rate-limited public downloads for this file (exceeded 24h traffic quota). Configure a Google Service Account in SuperAdmin Settings.",
+            }),
+            {
+              status: 429,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+                "Retry-After": "3600"
+              }
+            }
+          );
+        }
+
+        const contentRange = probeResp.headers.get("Content-Range") || "";
+        let totalSize = "";
+        if (contentRange.includes("/")) {
+          totalSize = contentRange.split("/")[1].trim();
+        }
+
+        const headHeaders = new Headers();
+        headHeaders.set("Access-Control-Allow-Origin", "*");
+        headHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+        headHeaders.set("Access-Control-Allow-Headers", "Range, Content-Type, Authorization");
+        headHeaders.set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges, Content-Type");
+        headHeaders.set("Accept-Ranges", "bytes");
+        headHeaders.set("Content-Type", defaultMime);
+        if (totalSize && totalSize !== "*") {
+          headHeaders.set("Content-Length", totalSize);
+        }
+        headHeaders.set("Cache-Control", "public, max-age=86400");
+
+        return new Response(null, {
+          status: 200,
+          headers: headHeaders,
+        });
+      } catch (headErr) {
+        return new Response(null, {
+          status: 200,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Accept-Ranges": "bytes",
+            "Content-Type": defaultMime,
+          }
+        });
+      }
+    }
+
+    // 5. Forward client Range header (defaulting to 8MB chunk if un-ranged to prevent Google Quota HTML errors on large files)
     const upstreamHeaders = new Headers();
     const rangeHeader = request.headers.get("Range");
     if (rangeHeader) {
       upstreamHeaders.set("Range", rangeHeader);
+    } else {
+      upstreamHeaders.set("Range", "bytes=0-8388607");
     }
     upstreamHeaders.set(
       "User-Agent",
@@ -87,12 +166,36 @@ export default {
 
     try {
       const gdriveResponse = await fetch(gdriveUrl, {
-        method: request.method,
+        method: "GET",
         headers: upstreamHeaders,
         redirect: "follow",
+        cf: {
+          cacheEverything: true,
+          cacheTtl: 86400,
+        }
       });
 
-      // 5. Clone and inject CORS + Range headers
+      const contentType = (gdriveResponse.headers.get("Content-Type") || "").toLowerCase();
+
+      // Check if Google Drive returned an HTML error/quota page instead of binary video
+      if (contentType.includes("text/html")) {
+        return new Response(
+          JSON.stringify({
+            error: "Google Drive Quota Exceeded",
+            details: "Google Drive has temporarily rate-limited public downloads for this file (exceeded 24h traffic quota). Configure a Google Service Account in SuperAdmin Settings to bypass anonymous limits.",
+          }),
+          {
+            status: 429,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": "*",
+              "Retry-After": "3600"
+            },
+          }
+        );
+      }
+
+      // 6. Clone and inject CORS + Range + Cache headers
       const responseHeaders = new Headers(gdriveResponse.headers);
       responseHeaders.set("Access-Control-Allow-Origin", "*");
       responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
@@ -102,18 +205,11 @@ export default {
         "Content-Range, Content-Length, Accept-Ranges, Content-Type"
       );
       responseHeaders.set("Accept-Ranges", "bytes");
+      responseHeaders.set("Cache-Control", "public, max-age=86400");
 
       // Infer proper video MIME type if Google returns octet-stream
-      const contentType = responseHeaders.get("Content-Type") || "";
-      const fileName = (url.searchParams.get("name") || "").toLowerCase();
-      if (!contentType || contentType.includes("octet-stream") || contentType.includes("text/html")) {
-        if (fileName.endsWith(".mkv")) {
-          responseHeaders.set("Content-Type", "video/x-matroska");
-        } else if (fileName.endsWith(".webm")) {
-          responseHeaders.set("Content-Type", "video/webm");
-        } else {
-          responseHeaders.set("Content-Type", "video/mp4");
-        }
+      if (!contentType || contentType.includes("octet-stream")) {
+        responseHeaders.set("Content-Type", defaultMime);
       }
 
       return new Response(gdriveResponse.body, {
@@ -124,7 +220,7 @@ export default {
     } catch (err) {
       return new Response(
         JSON.stringify({
-          error: "Failed to stream from Google Drive",
+          error: "Failed to stream from Google Drive upstream",
           details: err.message,
         }),
         {

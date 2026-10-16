@@ -470,6 +470,28 @@ class TestFilmsOverWeb(unittest.TestCase):
         set_setting_val("resend_api_key", "", db)
         db.close()
 
+    def test_13_stream_gdrive_quota_html_detection(self):
+        from unittest.mock import patch, MagicMock, AsyncMock
+        from app.auth import create_access_token
+
+        admin_client = TestClient(app)
+        tok = create_access_token({"sub": "test@gmail.com", "role": "superadmin"})
+
+        # Mock an upstream Google Drive response returning 200 OK with text/html (Quota exceeded)
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.headers = {"content-type": "text/html; charset=utf-8"}
+        mock_resp.aclose = AsyncMock()
+
+        # Mock async send
+        async def mock_send(req, stream=True):
+            return mock_resp
+
+        with patch("httpx.AsyncClient.send", side_effect=mock_send):
+            resp = admin_client.get(f"/stream/raw/5?token={tok}", headers={"Range": "bytes=0-1000"})
+            self.assertEqual(resp.status_code, 429)
+            self.assertIn("quota exceeded", resp.text.lower())
+
 if __name__ == "__main__":
     unittest.main()
 

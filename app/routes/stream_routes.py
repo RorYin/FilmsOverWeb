@@ -110,6 +110,15 @@ async def stream_gdrive_range(media_item, range_header: Optional[str], db: Sessi
                 detail=f"Google Drive stream error ({r.status_code})."
             )
 
+        upstream_ct = (r.headers.get("content-type") or "").lower()
+        if "text/html" in upstream_ct:
+            await r.aclose()
+            await client.aclose()
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Google Drive daily download quota exceeded for this file. Please configure a Google Service Account in SuperAdmin Settings or wait for Google's quota to reset."
+            )
+
         # If total_size was 0, extract it from upstream content-range if available
         if total_size <= 0 and "content-range" in r.headers:
             try:
