@@ -26,9 +26,11 @@
         <div class="hero-slide absolute inset-0 transition-opacity duration-1000 ease-in-out {% if loop.first %}opacity-100 pointer-events-auto z-10{% else %}opacity-0 pointer-events-none z-0{% endif %}" data-slide-index="{{ loop.index0 }}">
             <!-- Backdrop Image -->
             <img src="{{ movie.backdrop_path or movie.poster_path }}" alt="{{ movie.title }}" class="w-full h-full object-cover object-center filter brightness-90">
-            <!-- Dark Vignette & Gradient Overlays -->
-            <div class="absolute inset-0 hero-gradient"></div>
-            <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-transparent to-black/40"></div>
+            <!-- Dark Vignette & Cinematic Overlays (Universal webOS & Modern Browsers) -->
+            <div class="hero-overlay-top"></div>
+            <div class="hero-overlay-left"></div>
+            <div class="hero-overlay-right"></div>
+            <div class="hero-overlay-bottom"></div>
 
             <!-- Hero Content Text Overlay (Aligned to 90% container) -->
             <div class="absolute bottom-14 left-0 right-0 w-[90%] mx-auto px-2 sm:px-4 z-10">
@@ -69,11 +71,11 @@
 
                     <!-- Action Buttons -->
                     <div class="flex items-center space-x-4 pt-2">
-                        <a href="/watch/{{ movie.id }}" class="bg-brand-red hover:bg-brand-redHover text-black px-6 py-3 rounded-xl font-black text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
+                        <a href="/watch/{{ movie.id }}" class="hero-btn hero-watch-btn bg-brand-red hover:bg-brand-redHover text-black px-6 py-3 rounded-xl font-black text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105" tabindex="{% if loop.first %}0{% else %}-1{% endif %}">
                             <i data-lucide="play" class="w-5 h-5 fill-current"></i>
                             <span>Watch Now</span>
                         </a>
-                        <a href="/movie/{{ movie.id }}" class="bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 px-5 py-3 rounded-xl font-semibold text-sm flex items-center space-x-2 backdrop-blur transition">
+                        <a href="/movie/{{ movie.id }}" class="hero-btn hero-details-btn bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-600 px-5 py-3 rounded-xl font-semibold text-sm flex items-center space-x-2 backdrop-blur transition" tabindex="{% if loop.first %}0{% else %}-1{% endif %}">
                             <i data-lucide="info" class="w-5 h-5"></i>
                             <span>More Details</span>
                         </a>
@@ -135,20 +137,20 @@
             </div>
             <div class="carousel-track">
                 {% for item in continue_watching %}
-                <a href="{{ item.watch_url }}" class="group cursor-pointer block w-full movie-tile">
-                    <!-- Neat Rounded Corner Poster Tile with Progress Bar -->
-                    <div class="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
+                <a href="{{ item.watch_url }}" class="group cursor-pointer block w-full movie-tile" data-nav="tile" tabindex="0">
+                    <!-- Neat Rounded Corner Poster Tile with Progress Bar (Universal 2:3 aspect-ratio) -->
+                    <div class="movie-poster-box relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
                         <img src="{{ item.poster_path }}" alt="{{ item.title }}" loading="lazy" class="w-full h-full object-cover">
                         
                         <!-- Hover Play Indicator -->
-                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-200">
+                        <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-200 z-10">
                             <span class="w-12 h-12 rounded-full bg-brand-red text-black flex items-center justify-center shadow-xl transform group-hover:scale-110 transition">
                                 <i data-lucide="play" class="w-6 h-6 fill-current ml-0.5 text-black"></i>
                             </span>
                         </div>
 
                         {% if item.is_episode %}
-                        <div class="absolute top-2.5 right-2.5">
+                        <div class="absolute top-2.5 right-2.5 z-10">
                             <span class="px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md border border-amber-500/30 text-[10px] font-extrabold text-amber-400 uppercase">
                                 Episode
                             </span>
@@ -156,7 +158,7 @@
                         {% endif %}
 
                         <!-- Progress Bar along bottom of poster -->
-                        <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/80">
+                        <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-black/80 z-10">
                             <div class="h-full bg-brand-red" style="width: {{ item.progress_percent }}%;"></div>
                         </div>
                     </div>
@@ -242,13 +244,23 @@
             if (index >= slides.length) index = 0;
             currentIndex = index;
 
+            const hadTvFocus = document.activeElement && document.activeElement.closest('.hero-slide');
+            const isWatchBtnFocused = hadTvFocus && document.activeElement.classList.contains('hero-watch-btn');
+
             slides.forEach((slide, i) => {
                 if (i === currentIndex) {
                     slide.classList.remove('opacity-0', 'pointer-events-none', 'z-0');
                     slide.classList.add('opacity-100', 'pointer-events-auto', 'z-10');
+                    const heroBtns = slide.querySelectorAll('.hero-btn');
+                    heroBtns.forEach(btn => btn.setAttribute('tabindex', '0'));
+                    if (hadTvFocus && window.TvNav && window.TvNav.setFocus) {
+                        const targetBtn = isWatchBtnFocused ? slide.querySelector('.hero-watch-btn') : slide.querySelector('.hero-details-btn');
+                        if (targetBtn) window.TvNav.setFocus(targetBtn, false);
+                    }
                 } else {
                     slide.classList.remove('opacity-100', 'pointer-events-auto', 'z-10');
                     slide.classList.add('opacity-0', 'pointer-events-none', 'z-0');
+                    slide.querySelectorAll('.hero-btn').forEach(btn => btn.setAttribute('tabindex', '-1'));
                 }
             });
 

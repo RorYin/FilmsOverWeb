@@ -1,10 +1,10 @@
-<a href="/series/{{ series.id }}" class="group cursor-pointer block w-full movie-tile series-tile">
-    <!-- Neat Rounded Corner Poster Tile matching movie-tile dimensions -->
-    <div class="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
+<a href="/series/{{ series.id }}" class="group cursor-pointer block w-full movie-tile series-tile" data-nav="tile" tabindex="0">
+    <!-- Neat Rounded Corner Poster Tile matching movie-tile dimensions (Universal 2:3 aspect-ratio) -->
+    <div class="movie-poster-box relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
         <img src="{{ series.poster_path or series.backdrop_path or '/static/img/poster-placeholder.png' }}" alt="{{ series.title }}" loading="lazy" class="w-full h-full object-cover">
         
         <!-- TV Series Badge -->
-        <div class="absolute top-2.5 right-2.5">
+        <div class="absolute top-2.5 right-2.5 z-10">
             <span class="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md border border-white/10 text-[10px] font-extrabold text-amber-400 uppercase tracking-wider">
                 Series
             </span>
@@ -12,7 +12,7 @@
 
         {% if series.rating %}
         <!-- Rating Badge -->
-        <div class="absolute bottom-2.5 left-2.5">
+        <div class="absolute bottom-2.5 left-2.5 z-10">
             <span class="px-1.5 py-0.5 rounded-md bg-black/80 backdrop-blur-md border border-amber-500/30 text-[11px] font-bold text-amber-400 flex items-center space-x-1">
                 <i data-lucide="star" class="w-3 h-3 fill-current"></i>
                 <span>{{ series.rating }}</span>

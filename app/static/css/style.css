@@ -17,10 +17,17 @@
 /* Horizontal scrolling rails (Prime Video / Netflix carousel style) */
 .carousel-track {
     display: flex;
+    display: -webkit-box;
+    display: -webkit-flex;
     overflow-x: auto;
+    overflow-y: hidden;
     scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
     gap: 1.125rem;
+    padding-top: 0.6rem;
     padding-bottom: 1.5rem;
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
     scrollbar-width: thin;
     scrollbar-color: #222734 transparent;
 }
@@ -38,35 +45,110 @@
     background: #e5a00d;
 }
 
-/* Reduced tile sizes by 10% */
+/* Reduced tile sizes by 10% with explicit margin fallbacks for webOS */
 .carousel-track > .movie-tile,
 .carousel-track > .series-tile {
     flex: 0 0 9.45rem;
+    -webkit-flex: 0 0 9.45rem;
     width: 9.45rem;
+    margin-right: 1.125rem;
+    flex-shrink: 0;
+    -webkit-flex-shrink: 0;
+    outline: none;
+    text-decoration: none;
 }
+.carousel-track > .movie-tile:last-child,
+.carousel-track > .series-tile:last-child {
+    margin-right: 0;
+}
+
 @media (min-width: 640px) {
     .carousel-track > .movie-tile,
     .carousel-track > .series-tile {
         flex: 0 0 11.25rem;
+        -webkit-flex: 0 0 11.25rem;
         width: 11.25rem;
+        margin-right: 1.125rem;
     }
 }
 @media (min-width: 1024px) {
     .carousel-track > .movie-tile,
     .carousel-track > .series-tile {
         flex: 0 0 12.6rem;
+        -webkit-flex: 0 0 12.6rem;
         width: 12.6rem;
+        margin-right: 1.25rem;
     }
 }
 @media (min-width: 1440px) {
     .carousel-track > .movie-tile,
     .carousel-track > .series-tile {
         flex: 0 0 13.95rem;
+        -webkit-flex: 0 0 13.95rem;
         width: 13.95rem;
+        margin-right: 1.35rem;
     }
 }
 
-/* Movie Card Hover Dynamics */
+/* Universal 2:3 aspect ratio container (100% compatible with webOS 3-24, Tizen, iOS, Chrome, Firefox) */
+.movie-poster-box {
+    position: relative;
+    width: 100%;
+    padding-bottom: 150%; /* 3 / 2 = 1.5 = 150% */
+    border-radius: 1rem;
+    overflow: hidden;
+    background-color: #0f172a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.28s ease;
+    will-change: transform, box-shadow;
+}
+
+.movie-poster-box img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* Fallback for aspect-ratio utilities on older webOS (< Chromium 88) */
+@supports not (aspect-ratio: 2 / 3) {
+    .aspect-\[2\/3\] {
+        position: relative !important;
+        padding-bottom: 150% !important;
+        height: 0 !important;
+    }
+    .aspect-\[2\/3\] > img,
+    .aspect-\[2\/3\] > div {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+@supports not (aspect-ratio: 16 / 9) {
+    .aspect-video {
+        position: relative !important;
+        padding-bottom: 56.25% !important;
+        height: 0 !important;
+    }
+    .aspect-video > img,
+    .aspect-video > video,
+    .aspect-video > div {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+}
+
+/* Movie Card Hover Dynamics (Desktop Mouse) */
 .movie-card {
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -76,11 +158,59 @@
     z-index: 20;
 }
 
-/* Hero Billboard Gradient Overlay (Sides faded, full width) */
+/* Hero Billboard Gradient Overlays (Netflix / Prime Video OTT Style) */
+.hero-overlay-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 70%;
+    background: -webkit-linear-gradient(top, rgba(11, 12, 14, 0) 0%, rgba(11, 12, 14, 0.7) 45%, #0b0c0e 100%);
+    background: linear-gradient(to bottom, rgba(11, 12, 14, 0) 0%, rgba(11, 12, 14, 0.7) 45%, #0b0c0e 100%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.hero-overlay-left {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 60%;
+    background: -webkit-linear-gradient(left, #0b0c0e 0%, rgba(11, 12, 14, 0.88) 40%, rgba(11, 12, 14, 0) 100%);
+    background: linear-gradient(to right, #0b0c0e 0%, rgba(11, 12, 14, 0.88) 40%, rgba(11, 12, 14, 0) 100%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.hero-overlay-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 25%;
+    background: -webkit-linear-gradient(right, rgba(11, 12, 14, 0.85) 0%, rgba(11, 12, 14, 0) 100%);
+    background: linear-gradient(to left, rgba(11, 12, 14, 0.85) 0%, rgba(11, 12, 14, 0) 100%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+.hero-overlay-top {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 35%;
+    background: -webkit-linear-gradient(bottom, rgba(11, 12, 14, 0) 0%, rgba(11, 12, 14, 0.6) 100%);
+    background: linear-gradient(to top, rgba(11, 12, 14, 0) 0%, rgba(11, 12, 14, 0.6) 100%);
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Fallback combined hero-gradient */
 .hero-gradient {
-    background: linear-gradient(0deg, #0b0c0e 0%, rgba(11, 12, 14, 0.8) 25%, rgba(11, 12, 14, 0.2) 60%, rgba(11, 12, 14, 0.9) 100%),
-                linear-gradient(90deg, #0b0c0e 0%, rgba(11, 12, 14, 0.85) 30%, rgba(11, 12, 14, 0) 65%),
-                linear-gradient(270deg, #0b0c0e 0%, rgba(11, 12, 14, 0.8) 18%, transparent 40%);
+    background: -webkit-linear-gradient(top, rgba(11, 12, 14, 0) 0%, rgba(11, 12, 14, 0.85) 60%, #0b0c0e 100%);
+    background: linear-gradient(to bottom, rgba(11, 12, 14, 0) 0%, rgba(11, 12, 14, 0.85) 60%, #0b0c0e 100%);
 }
 
 .hero-vignette {
@@ -93,4 +223,65 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   Smart TV Spatial Navigation & High-Contrast Focus Ring
+   ========================================================================== */
+.tv-focused {
+    outline: none !important;
+    border-color: #e5a00d !important;
+    box-shadow: 0 0 0 3.5px #e5a00d, 0 10px 30px rgba(229, 160, 13, 0.55) !important;
+    transform: scale(1.06) !important;
+    z-index: 45 !important;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+/* For movie and series tiles when focused by TV remote */
+.movie-tile.tv-focused .movie-poster-box,
+.series-tile.tv-focused .movie-poster-box {
+    border-color: #e5a00d !important;
+    box-shadow: 0 0 0 3.5px #e5a00d, 0 14px 34px rgba(0, 0, 0, 0.9), 0 0 24px rgba(229, 160, 13, 0.65) !important;
+    transform: scale(1.06) !important;
+}
+
+.movie-tile.tv-focused,
+.series-tile.tv-focused {
+    transform: none !important;
+}
+
+.movie-tile.tv-focused h3,
+.series-tile.tv-focused h3 {
+    color: #ffffff !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* TV Focus on Hero buttons */
+.hero-btn.tv-focused {
+    border-color: #ffffff !important;
+    box-shadow: 0 0 0 4px #ffffff, 0 12px 35px rgba(229, 160, 13, 0.7) !important;
+    transform: scale(1.08) !important;
+}
+
+/* TV Focus on Navbar elements */
+nav a.tv-focused,
+nav button.tv-focused {
+    background-color: #e5a00d !important;
+    color: #0b0c0e !important;
+    border-color: #e5a00d !important;
+    box-shadow: 0 0 0 3px #e5a00d, 0 4px 16px rgba(229, 160, 13, 0.5) !important;
+    font-weight: 800 !important;
+}
+
+nav a.tv-focused span,
+nav a.tv-focused i,
+nav button.tv-focused span,
+nav button.tv-focused i {
+    color: #0b0c0e !important;
+}
+
+/* TV Press feedback */
+.tv-pressed {
+    transform: scale(0.96) !important;
+    transition: transform 0.1s ease !important;
 }

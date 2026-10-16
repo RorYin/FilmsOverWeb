@@ -8,8 +8,8 @@
     <!-- Hero Backdrop Banner -->
     <div class="relative w-full h-[50vh] min-h-[380px] max-h-[550px] overflow-hidden">
         <img src="{{ series.backdrop_path or series.poster_path }}" alt="{{ series.title }}" class="w-full h-full object-cover object-center filter brightness-75">
-        <div class="absolute inset-0 hero-gradient"></div>
-        <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-[#0b0c0e]/60 to-transparent"></div>
+        <div class="hero-overlay-top"></div>
+        <div class="hero-overlay-bottom"></div>
     </div>
 
     <!-- Main Content Container overlapping backdrop -->
@@ -18,7 +18,7 @@
             
             <!-- Poster Column -->
             <div class="w-56 sm:w-64 flex-none mx-auto md:mx-0">
-                <div class="rounded-2xl overflow-hidden border-2 border-brand-border shadow-2xl bg-brand-surface aspect-[2/3] relative">
+                <div class="movie-poster-box rounded-2xl overflow-hidden border-2 border-brand-border shadow-2xl bg-brand-surface relative">
                     <img src="{{ series.poster_path }}" alt="{{ series.title }}" class="w-full h-full object-cover">
                     
                     {% if series.rating > 0 %}

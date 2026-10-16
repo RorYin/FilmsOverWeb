@@ -197,17 +197,9 @@
                 });
             }
         })();
-
-        // LG webOS / Smart TV Remote Back Button handler (KeyCode: 461)
-        window.addEventListener('keydown', function(e) {
-            if (e.keyCode === 461 || e.key === 'Back') {
-                if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
-                    e.preventDefault();
-                    window.history.back();
-                }
-            }
-        });
     </script>
+
+    <script src="/static/js/tv-navigation.js?v=2"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>
