@@ -648,6 +648,112 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertIn(b"#EXTM3U", ep_m3u_resp.content)
         self.assertIn(f"/stream/episode/raw/{episode_id}?token=".encode(), ep_m3u_resp.content)
 
+    def test_17_sync_folder_deletes_removed_content(self):
+        """Test that syncing a folder deletes movies and episodes that were removed from Google Drive."""
+        from unittest.mock import patch
+        import asyncio
+        from app.routes.admin_routes import perform_sync_folder
+        from app.models import DriveFolder, Movie, Series, Episode
+
+        db = SessionLocal()
+        # Create a dedicated test folder
+        test_folder = DriveFolder(
+            folder_id="test_sync_delete_folder_id",
+            folder_name="Sync Deletion Test Folder"
+        )
+        db.add(test_folder)
+        db.commit()
+
+        # Movie 1 will stay in Drive, Movie 2 will be removed from Drive
+        m1 = Movie(
+            folder_id=test_folder.id,
+            gdrive_file_id="staying_movie_fid",
+            file_name="Staying.Movie.2024.mp4",
+            title="Staying Movie"
+        )
+        m2 = Movie(
+            folder_id=test_folder.id,
+            gdrive_file_id="deleted_movie_fid",
+            file_name="Deleted.Movie.2024.mp4",
+            title="Deleted Movie"
+        )
+        db.add_all([m1, m2])
+
+        # Series with 2 episodes: ep1 stays in Drive, ep2 will be removed from Drive
+        series = Series(
+            folder_id=test_folder.id,
+            title="Sync Test Series"
+        )
+        db.add(series)
+        db.commit()
+
+        ep1 = Episode(
+            folder_id=test_folder.id,
+            series_id=series.id,
+            season_number=1,
+            episode_number=1,
+            gdrive_file_id="staying_ep_fid",
+            file_name="Series.S01E01.mp4",
+            title="Staying Episode"
+        )
+        ep2 = Episode(
+            folder_id=test_folder.id,
+            series_id=series.id,
+            season_number=1,
+            episode_number=2,
+            gdrive_file_id="deleted_ep_fid",
+            file_name="Series.S01E02.mp4",
+            title="Deleted Episode"
+        )
+        db.add_all([ep1, ep2])
+        db.commit()
+
+        # Mock list_files_in_drive_folder to return only m1 and ep1 (m2 and ep2 removed)
+        mock_files = [
+            {"id": "staying_movie_fid", "name": "Staying.Movie.2024.mp4"},
+            {"id": "staying_ep_fid", "name": "Series.S01E01.mp4", "folder_path": ["Sync Test Series", "Season 1"]}
+        ]
+
+        async def run_sync():
+            with patch("app.routes.admin_routes.list_files_in_drive_folder", return_value=mock_files):
+                await perform_sync_folder(test_folder.id, SessionLocal)
+
+        asyncio.run(run_sync())
+
+        # Verify m1 exists, m2 was deleted
+        db = SessionLocal()
+        self.assertIsNotNone(db.query(Movie).filter(Movie.gdrive_file_id == "staying_movie_fid").first())
+        self.assertIsNone(db.query(Movie).filter(Movie.gdrive_file_id == "deleted_movie_fid").first())
+
+        # Verify ep1 exists, ep2 was deleted, series is still there with 1 episode
+        self.assertIsNotNone(db.query(Episode).filter(Episode.gdrive_file_id == "staying_ep_fid").first())
+        self.assertIsNone(db.query(Episode).filter(Episode.gdrive_file_id == "deleted_ep_fid").first())
+        updated_series = db.query(Series).filter(Series.id == series.id).first()
+        self.assertIsNotNone(updated_series)
+        self.assertEqual(updated_series.total_episodes, 1)
+
+        # Now simulate a second sync where ep1 is also removed (only m1 remains in folder)
+        mock_files_no_eps = [
+            {"id": "staying_movie_fid", "name": "Staying.Movie.2024.mp4"}
+        ]
+        async def run_sync2():
+            with patch("app.routes.admin_routes.list_files_in_drive_folder", return_value=mock_files_no_eps):
+                await perform_sync_folder(test_folder.id, SessionLocal)
+
+        asyncio.run(run_sync2())
+
+        db = SessionLocal()
+        # Verify ep1 is now deleted, and the orphan Series with 0 episodes is also deleted
+        self.assertIsNone(db.query(Episode).filter(Episode.gdrive_file_id == "staying_ep_fid").first())
+        self.assertIsNone(db.query(Series).filter(Series.id == series.id).first())
+        self.assertIsNotNone(db.query(Movie).filter(Movie.gdrive_file_id == "staying_movie_fid").first())
+
+        # Clean up test objects
+        db.delete(m1)
+        db.delete(test_folder)
+        db.commit()
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

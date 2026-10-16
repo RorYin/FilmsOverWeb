@@ -122,6 +122,8 @@ async def scrape_public_drive_folder(root_folder_id: str, max_depth: int = 3) ->
             try:
                 resp = await client.get(url, headers=headers)
                 if resp.status_code != 200:
+                    if folder_id == root_folder_id:
+                        raise RuntimeError(f"Google Drive returned HTTP {resp.status_code} for root folder {root_folder_id}")
                     continue
 
                 html = resp.text
@@ -165,6 +167,8 @@ async def scrape_public_drive_folder(root_folder_id: str, max_depth: int = 3) ->
 
             except Exception as e:
                 print(f"[GDRIVE] Error scraping public folder {folder_id}: {e}")
+                if folder_id == root_folder_id:
+                    raise
 
     return video_files
 

@@ -34,7 +34,7 @@
     {% if request.query_params.get('synced') == 'started' %}
     <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2">
         <i data-lucide="check-circle" class="w-4 h-4 flex-none"></i>
-        <span>Drive folder scan started in background! Newly discovered movies will appear in the library as TMDB metadata is enriched. Refresh in a moment.</span>
+        <span>Drive folder sync started in background! Newly discovered content will appear in the library and any deleted files will be removed. Refresh in a moment.</span>
     </div>
     {% endif %}
 

@@ -98,8 +98,22 @@ async def delete_folder(
 ):
     folder = db.query(DriveFolder).filter(DriveFolder.id == folder_id).first()
     if folder:
+        # Collect affected series before deleting episodes in this folder
+        folder_episodes = db.query(Episode).filter(Episode.folder_id == folder.id).all()
+        series_ids = {ep.series_id for ep in folder_episodes if ep.series_id}
+
         db.delete(folder)
         db.commit()
+
+        # Clean up any series that no longer have any episodes
+        for s_id in series_ids:
+            remaining = db.query(Episode).filter(Episode.series_id == s_id).all()
+            if not remaining:
+                s_obj = db.query(Series).filter(Series.id == s_id).first()
+                if s_obj:
+                    db.delete(s_obj)
+        db.commit()
+
     return RedirectResponse(url="/admin/folders", status_code=status.HTTP_302_FOUND)
 
 _ACTIVE_SYNCS = set()
@@ -120,6 +134,63 @@ async def perform_sync_folder(folder_db_id: int, db_factory):
         print(f"[SYNC] Starting scan for Google Drive Folder '{folder.folder_name}' ({folder.folder_id})...")
         files = await list_files_in_drive_folder(folder.folder_id, db)
         print(f"[SYNC] Found {len(files)} video files in folder.")
+
+        # Classify active files currently present in Google Drive
+        active_movie_file_ids = set()
+        active_episode_file_ids = set()
+
+        for f in files:
+            fid = f.get("id")
+            if not fid:
+                continue
+            filename = f.get("name", "")
+            folder_path = f.get("folder_path", [])
+            if parse_episode_info(filename, folder_path):
+                active_episode_file_ids.add(fid)
+            else:
+                active_movie_file_ids.add(fid)
+
+        # 1. Detect and delete removed movies that were previously indexed under this folder
+        existing_movies = db.query(Movie).filter(Movie.folder_id == folder.id).all()
+        deleted_movies = 0
+        for m in existing_movies:
+            if m.gdrive_file_id not in active_movie_file_ids:
+                print(f"[SYNC] Movie '{m.title}' (file: {m.file_name}, id: {m.id}) was removed from Google Drive folder '{folder.folder_name}'. Deleting from library.")
+                db.delete(m)
+                deleted_movies += 1
+
+        # 2. Detect and delete removed TV episodes that were previously indexed under this folder
+        existing_episodes = db.query(Episode).filter(Episode.folder_id == folder.id).all()
+        deleted_episodes = 0
+        affected_series_ids = set()
+        for ep in existing_episodes:
+            if ep.gdrive_file_id not in active_episode_file_ids:
+                print(f"[SYNC] Episode '{ep.title}' (file: {ep.file_name}, id: {ep.id}) was removed from Google Drive folder '{folder.folder_name}'. Deleting from library.")
+                if ep.series_id:
+                    affected_series_ids.add(ep.series_id)
+                db.delete(ep)
+                deleted_episodes += 1
+
+        # 3. Clean up any Series that now have no remaining episodes
+        deleted_series = 0
+        for s_id in affected_series_ids:
+            remaining_eps = db.query(Episode).filter(Episode.series_id == s_id).all()
+            if not remaining_eps:
+                series_obj = db.query(Series).filter(Series.id == s_id).first()
+                if series_obj:
+                    print(f"[SYNC] Series '{series_obj.title}' (id: {series_obj.id}) has no remaining episodes. Deleting series.")
+                    db.delete(series_obj)
+                    deleted_series += 1
+            else:
+                series_obj = db.query(Series).filter(Series.id == s_id).first()
+                if series_obj:
+                    series_obj.total_episodes = len(remaining_eps)
+                    distinct_seasons = {e.season_number for e in remaining_eps if e.season_number}
+                    series_obj.total_seasons = len(distinct_seasons) if distinct_seasons else 1
+
+        if deleted_movies > 0 or deleted_episodes > 0 or deleted_series > 0:
+            db.commit()
+            print(f"[SYNC] Purged removed items: {deleted_movies} movies, {deleted_episodes} TV episodes, and {deleted_series} empty series.")
 
         tmdb_key = get_active_tmdb_key(db)
 
@@ -252,7 +323,7 @@ async def perform_sync_folder(folder_db_id: int, db_factory):
         folder.movie_count = m_count + ep_count
         folder.last_synced_at = datetime.now(timezone.utc)
         db.commit()
-        print(f"[SYNC] Successfully synced folder '{folder.folder_name}'. Added {synced_movies} movies and {synced_episodes} TV episodes.")
+        print(f"[SYNC] Successfully synced folder '{folder.folder_name}'. Added: {synced_movies} movies, {synced_episodes} TV episodes. Deleted: {deleted_movies} movies, {deleted_episodes} episodes, {deleted_series} empty series.")
     except Exception as e:
         print(f"[SYNC] Error during folder sync: {e}")
         db.rollback()
