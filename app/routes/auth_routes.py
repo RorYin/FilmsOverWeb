@@ -74,6 +74,9 @@ async def change_password_page(request: Request, db: Session = Depends(get_db)):
     if not user:
         return RedirectResponse(url="/login?next=/change-password", status_code=status.HTTP_302_FOUND)
     
+    if user.email == "guest@filmsoverweb.com":
+        return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+
     return templates.TemplateResponse(
         request=request,
         name="change_password.html",
@@ -97,6 +100,18 @@ async def change_password_action(
     user = get_current_user_optional(request, db)
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+
+    if user.email == "guest@filmsoverweb.com":
+        return templates.TemplateResponse(
+            request=request,
+            name="change_password.html",
+            context={
+                "user": user,
+                "is_first_time": False,
+                "error": "Password cannot be changed for the default guest account."
+            },
+            status_code=400
+        )
 
     # Validate current password
     if not verify_password(current_password, user.hashed_password):

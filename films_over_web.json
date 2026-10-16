@@ -4,7 +4,7 @@
       "id": 2,
       "email": "test@gmail.com",
       "name": "Super Administrator",
-      "hashed_password": "$2b$12$3FbYNDspxkZlFwPCE/yYuuKvoYLn2rVOkrkfZI8eer6APdpm4.H0y",
+      "hashed_password": "$2b$12$.M8UM6Vq9.em2odks7cc6OyiJm2CbslcD5q8AgIb29PgDQ2PsQ9Gi",
       "role": "superadmin",
       "is_active": 1,
       "must_change_password": false,
@@ -19,6 +19,16 @@
       "is_active": 1,
       "must_change_password": false,
       "created_at": "2026-10-15T20:02:34.376541"
+    },
+    {
+      "id": 4,
+      "email": "guest@filmsoverweb.com",
+      "name": "Guest User",
+      "hashed_password": "$2b$12$51WNHJm.HU2QZC12fV.ileLU5kifO.NGXA7qTm9YhU1tNeSdP7gLq",
+      "role": "guest",
+      "is_active": true,
+      "must_change_password": false,
+      "created_at": "2026-10-16T17:16:47.068428+00:00"
     }
   ],
   "drive_folders": [

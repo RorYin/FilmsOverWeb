@@ -138,10 +138,12 @@
                             {% endif %}
 
                             <div class="border-t border-brand-border/60 my-1"></div>
+                            {% if user.email != 'guest@filmsoverweb.com' %}
                             <a href="/change-password" class="px-4 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white flex items-center space-x-2.5 transition">
                                 <i data-lucide="key" class="w-4 h-4 text-amber-400"></i>
                                 <span>Change Password</span>
                             </a>
+                            {% endif %}
                             <a href="/logout" class="px-4 py-2 text-xs text-rose-400 hover:bg-rose-500/10 flex items-center space-x-2.5 transition">
                                 <i data-lucide="log-out" class="w-4 h-4"></i>
                                 <span>Sign Out</span>

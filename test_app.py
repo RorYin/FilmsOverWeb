@@ -6,6 +6,7 @@ from app.gdrive import extract_folder_id
 from app.mailer import generate_secure_password
 from app.database import Base, engine, SessionLocal
 from app.models import User, DriveFolder, Movie
+from app.auth import init_default_users
 
 class TestFilmsOverWeb(unittest.TestCase):
 
@@ -538,6 +539,46 @@ class TestFilmsOverWeb(unittest.TestCase):
             set_setting_val("google_service_account_json", "", db)
             db.close()
 
+    def test_15_guest_filmsoverweb_login_flow(self):
+        """Test default guest user (guest@filmsoverweb.com) login without forced password change."""
+        db = SessionLocal()
+        init_default_users(db)
+        guest_user = db.query(User).filter(User.email == "guest@filmsoverweb.com").first()
+        self.assertIsNotNone(guest_user)
+        self.assertFalse(guest_user.must_change_password)
+        self.assertEqual(guest_user.role, "guest")
+        db.close()
+
+        # Login as guest@filmsoverweb.com
+        client = TestClient(app)
+        login_resp = client.post("/login", data={
+            "email": "guest@filmsoverweb.com",
+            "password": "guest@123",
+            "next": "/"
+        }, follow_redirects=False)
+        self.assertEqual(login_resp.status_code, 302)
+        # Should redirect directly to '/' and NOT to '/change-password'
+        self.assertEqual(login_resp.headers.get("location"), "/")
+
+        # Following to home page should succeed without redirecting to change-password
+        home_resp = client.get("/", follow_redirects=False)
+        self.assertEqual(home_resp.status_code, 200)
+
+        # Attempting to visit /change-password should redirect away to '/'
+        change_page_resp = client.get("/change-password", follow_redirects=False)
+        self.assertEqual(change_page_resp.status_code, 302)
+        self.assertEqual(change_page_resp.headers.get("location"), "/")
+
+        # Attempting to POST to /change-password should be rejected
+        change_post_resp = client.post("/change-password", data={
+            "current_password": "guest@123",
+            "new_password": "newpass12345",
+            "confirm_password": "newpass12345"
+        })
+        self.assertEqual(change_post_resp.status_code, 400)
+        self.assertIn(b"Password cannot be changed for the default guest account", change_post_resp.content)
+
 if __name__ == "__main__":
     unittest.main()
+
 

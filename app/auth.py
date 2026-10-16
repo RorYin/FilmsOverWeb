@@ -147,3 +147,34 @@ def init_default_users(db: Session):
             db.add(default_admin)
             db.commit()
             print(f"[AUTH] Created SuperAdmin ({target_email}) with must_change_password={not is_env_set}")
+
+    # Ensure default guest user exists with must_change_password=False
+    guest_email = "guest@filmsoverweb.com"
+    guest_password = "guest@123"
+    guest_user = db.query(User).filter(User.email == guest_email).first()
+    if not guest_user:
+        guest_user = User(
+            email=guest_email,
+            name="Guest User",
+            hashed_password=get_password_hash(guest_password),
+            role="guest",
+            must_change_password=False,
+            is_active=True
+        )
+        db.add(guest_user)
+        db.commit()
+        print(f"[AUTH] Created default Guest user ({guest_email}) with must_change_password=False")
+    else:
+        needs_guest_update = False
+        if not verify_password(guest_password, guest_user.hashed_password):
+            guest_user.hashed_password = get_password_hash(guest_password)
+            needs_guest_update = True
+        if guest_user.must_change_password:
+            guest_user.must_change_password = False
+            needs_guest_update = True
+        if not guest_user.is_active:
+            guest_user.is_active = True
+            needs_guest_update = True
+        if needs_guest_update:
+            db.commit()
+            print(f"[AUTH] Ensured default Guest user ({guest_email}) is active with must_change_password=False")
