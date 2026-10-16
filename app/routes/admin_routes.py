@@ -102,8 +102,15 @@ async def delete_folder(
         db.commit()
     return RedirectResponse(url="/admin/folders", status_code=status.HTTP_302_FOUND)
 
+_ACTIVE_SYNCS = set()
+
 async def perform_sync_folder(folder_db_id: int, db_factory):
     """Background task to sync movies and TV series from Google Drive folder and enrich via TMDB."""
+    if folder_db_id in _ACTIVE_SYNCS:
+        print(f"[SYNC] Folder ID {folder_db_id} sync is already running in background. Skipping duplicate trigger.")
+        return
+    _ACTIVE_SYNCS.add(folder_db_id)
+
     db = db_factory()
     try:
         folder = db.query(DriveFolder).filter(DriveFolder.id == folder_db_id).first()
@@ -119,117 +126,125 @@ async def perform_sync_folder(folder_db_id: int, db_factory):
         synced_movies = 0
         synced_episodes = 0
         for f in files:
-            gdrive_file_id = f["id"]
-            filename = f["name"]
-            folder_path = f.get("folder_path", [])
+            try:
+                gdrive_file_id = f["id"]
+                filename = f["name"]
+                folder_path = f.get("folder_path", [])
 
-            # Check if this video is an episode of a TV/Web Series
-            ep_info = parse_episode_info(filename, folder_path)
-            if ep_info:
-                # Check if episode already indexed
-                episode = db.query(Episode).filter(Episode.gdrive_file_id == gdrive_file_id).first()
-                if not episode:
-                    # Find or create Series
-                    series_title = ep_info["series_title"]
-                    series = db.query(Series).filter(
-                        (Series.title.ilike(series_title)) | 
-                        (Series.original_title.ilike(series_title))
-                    ).first()
+                # Check if this video is an episode of a TV/Web Series
+                ep_info = parse_episode_info(filename, folder_path)
+                if ep_info:
+                    # Check if episode already indexed
+                    episode = db.query(Episode).filter(Episode.gdrive_file_id == gdrive_file_id).first()
+                    if not episode:
+                        # Find or create Series
+                        series_title = ep_info["series_title"]
+                        series = db.query(Series).filter(
+                            (Series.title.ilike(series_title)) | 
+                            (Series.original_title.ilike(series_title))
+                        ).first()
 
-                    if not series:
-                        smeta = await enrich_series_data(series_title, ep_info["year"], tmdb_key)
-                        series = Series(
-                            folder_id=folder.id,
-                            title=smeta["title"],
-                            original_title=smeta["original_title"],
-                            year=smeta["year"],
-                            tmdb_id=smeta["tmdb_id"],
-                            overview=smeta["overview"],
-                            tagline=smeta["tagline"],
-                            poster_path=smeta["poster_path"],
-                            backdrop_path=smeta["backdrop_path"],
-                            rating=smeta["rating"],
-                            vote_count=smeta["vote_count"],
-                            genres=smeta["genres"],
-                            cast=smeta["cast"],
-                            creator=smeta["creator"],
-                            original_language=smeta["original_language"],
-                            total_seasons=smeta["total_seasons"],
-                            total_episodes=smeta["total_episodes"]
+                        if not series:
+                            smeta = await enrich_series_data(series_title, ep_info["year"], tmdb_key)
+                            series = Series(
+                                folder_id=folder.id,
+                                title=smeta["title"],
+                                original_title=smeta["original_title"],
+                                year=smeta["year"],
+                                tmdb_id=smeta["tmdb_id"],
+                                overview=smeta["overview"],
+                                tagline=smeta["tagline"],
+                                poster_path=smeta["poster_path"],
+                                backdrop_path=smeta["backdrop_path"],
+                                rating=smeta["rating"],
+                                vote_count=smeta["vote_count"],
+                                genres=smeta["genres"],
+                                cast=smeta["cast"],
+                                creator=smeta["creator"],
+                                original_language=smeta["original_language"],
+                                total_seasons=smeta["total_seasons"],
+                                total_episodes=smeta["total_episodes"]
+                            )
+                            db.add(series)
+                            db.commit()
+                            db.refresh(series)
+
+                        # Enrich episode metadata
+                        ep_meta = await enrich_episode_data(
+                            series.tmdb_id,
+                            ep_info["season_number"],
+                            ep_info["episode_number"],
+                            ep_info["episode_title"],
+                            tmdb_key
                         )
-                        db.add(series)
+
+                        episode = Episode(
+                            series_id=series.id,
+                            folder_id=folder.id,
+                            season_number=ep_info["season_number"],
+                            episode_number=ep_info["episode_number"],
+                            title=ep_meta["title"],
+                            overview=ep_meta["overview"],
+                            still_path=ep_meta["still_path"],
+                            air_date=ep_meta["air_date"],
+                            rating=ep_meta["rating"],
+                            duration=ep_meta["duration"],
+                            gdrive_file_id=gdrive_file_id,
+                            file_name=filename,
+                            file_size=f.get("size", 0),
+                            mime_type=f.get("mimeType", "video/mp4"),
+                            codec=ep_info["codec"],
+                            resolution=ep_info["resolution"]
+                        )
+                        db.add(episode)
                         db.commit()
-                        db.refresh(series)
-
-                    # Enrich episode metadata
-                    ep_meta = await enrich_episode_data(
-                        series.tmdb_id,
-                        ep_info["season_number"],
-                        ep_info["episode_number"],
-                        ep_info["episode_title"],
-                        tmdb_key
-                    )
-
-                    episode = Episode(
-                        series_id=series.id,
-                        folder_id=folder.id,
-                        season_number=ep_info["season_number"],
-                        episode_number=ep_info["episode_number"],
-                        title=ep_meta["title"],
-                        overview=ep_meta["overview"],
-                        still_path=ep_meta["still_path"],
-                        air_date=ep_meta["air_date"],
-                        rating=ep_meta["rating"],
-                        duration=ep_meta["duration"],
-                        gdrive_file_id=gdrive_file_id,
-                        file_name=filename,
-                        file_size=f.get("size", 0),
-                        mime_type=f.get("mimeType", "video/mp4"),
-                        codec=ep_info["codec"],
-                        resolution=ep_info["resolution"]
-                    )
-                    db.add(episode)
-                    synced_episodes += 1
+                        synced_episodes += 1
+                    else:
+                        if episode.folder_id != folder.id:
+                            episode.folder_id = folder.id
+                            db.commit()
                 else:
-                    if episode.folder_id != folder.id:
-                        episode.folder_id = folder.id
-            else:
-                # Standalone Movie
-                movie = db.query(Movie).filter(Movie.gdrive_file_id == gdrive_file_id).first()
-                if not movie:
-                    parsed = parse_filename(filename)
-                    meta = await enrich_movie_data(parsed["title"], parsed["year"], tmdb_key)
+                    # Standalone Movie
+                    movie = db.query(Movie).filter(Movie.gdrive_file_id == gdrive_file_id).first()
+                    if not movie:
+                        parsed = parse_filename(filename)
+                        meta = await enrich_movie_data(parsed["title"], parsed["year"], tmdb_key)
 
-                    movie = Movie(
-                        gdrive_file_id=gdrive_file_id,
-                        folder_id=folder.id,
-                        file_name=filename,
-                        file_size=f.get("size", 0),
-                        mime_type=f.get("mimeType", "video/mp4"),
-                        codec=parsed["codec"],
-                        resolution=parsed["resolution"],
-                        tmdb_id=meta["tmdb_id"],
-                        title=meta["title"],
-                        original_title=meta["original_title"],
-                        year=meta["year"],
-                        overview=meta["overview"],
-                        tagline=meta["tagline"],
-                        poster_path=meta["poster_path"],
-                        backdrop_path=meta["backdrop_path"],
-                        rating=meta["rating"],
-                        vote_count=meta["vote_count"],
-                        duration=meta["duration"],
-                        genres=meta["genres"],
-                        cast=meta["cast"],
-                        director=meta["director"],
-                        trailer_url=meta["trailer_url"],
-                        original_language=meta.get("original_language", "English")
-                    )
-                    db.add(movie)
-                    synced_movies += 1
-                else:
-                    if movie.folder_id != folder.id:
-                        movie.folder_id = folder.id
+                        movie = Movie(
+                            gdrive_file_id=gdrive_file_id,
+                            folder_id=folder.id,
+                            file_name=filename,
+                            file_size=f.get("size", 0),
+                            mime_type=f.get("mimeType", "video/mp4"),
+                            codec=parsed["codec"],
+                            resolution=parsed["resolution"],
+                            tmdb_id=meta["tmdb_id"],
+                            title=meta["title"],
+                            original_title=meta["original_title"],
+                            year=meta["year"],
+                            overview=meta["overview"],
+                            tagline=meta["tagline"],
+                            poster_path=meta["poster_path"],
+                            backdrop_path=meta["backdrop_path"],
+                            rating=meta["rating"],
+                            vote_count=meta["vote_count"],
+                            duration=meta["duration"],
+                            genres=meta["genres"],
+                            cast=meta["cast"],
+                            director=meta["director"],
+                            trailer_url=meta["trailer_url"],
+                            original_language=meta.get("original_language", "English")
+                        )
+                        db.add(movie)
+                        db.commit()
+                        synced_movies += 1
+                    else:
+                        if movie.folder_id != folder.id:
+                            movie.folder_id = folder.id
+                            db.commit()
+            except Exception as item_err:
+                print(f"[SYNC] Error indexing file '{f.get('name')}': {item_err}")
+                db.rollback()
 
         # Update folder counts
         m_count = db.query(Movie).filter(Movie.folder_id == folder.id).count()
@@ -242,6 +257,7 @@ async def perform_sync_folder(folder_db_id: int, db_factory):
         print(f"[SYNC] Error during folder sync: {e}")
         db.rollback()
     finally:
+        _ACTIVE_SYNCS.discard(folder_db_id)
         db.close()
 
 @router.post("/folders/{folder_id}/sync")

@@ -16,29 +16,50 @@ from app.routes.admin_routes import perform_sync_folder
 
 async def init_default_folders(db: SessionLocal):
     raw_urls = os.getenv("DRIVE_FOLDER_URLS") or settings.DEFAULT_DRIVE_FOLDER_URL or ""
-    if not raw_urls.strip():
-        return
+    if raw_urls.strip():
+        url_list = [u.strip() for u in re.split(r'[,;\n\r]+', raw_urls) if u.strip()]
 
-    url_list = [u.strip() for u in re.split(r'[,;\n\r]+', raw_urls) if u.strip()]
+        for folder_url in url_list:
+            folder_id = extract_folder_id(folder_url)
+            if not folder_id:
+                continue
+            existing = db.query(DriveFolder).filter(DriveFolder.folder_id == folder_id).first()
+            if not existing:
+                meta = await fetch_folder_metadata(folder_id, db)
+                name = meta.get("name") or f"Drive Folder ({folder_id[:8]}...)"
+                folder = DriveFolder(
+                    folder_id=folder_id,
+                    folder_name=name,
+                    folder_url=folder_url
+                )
+                db.add(folder)
+                db.commit()
+                db.refresh(folder)
+                print(f"[STARTUP] Registered Google Drive folder: {folder.folder_name} ({folder_id})")
 
-    for folder_url in url_list:
-        folder_id = extract_folder_id(folder_url)
-        if not folder_id:
-            continue
-        existing = db.query(DriveFolder).filter(DriveFolder.folder_id == folder_id).first()
-        if not existing:
-            meta = await fetch_folder_metadata(folder_id, db)
-            name = meta.get("name") or f"Drive Folder ({folder_id[:8]}...)"
-            folder = DriveFolder(
-                folder_id=folder_id,
-                folder_name=name,
-                folder_url=folder_url
-            )
-            db.add(folder)
-            db.commit()
-            db.refresh(folder)
-            print(f"[STARTUP] Registered Google Drive folder: {folder.folder_name} ({folder_id})")
-            asyncio.create_task(perform_sync_folder(folder.id, SessionLocal))
+    # Automatically trigger sync for ALL registered folders on startup/reload
+    registered_folders = db.query(DriveFolder).all()
+    for f in registered_folders:
+        print(f"[STARTUP] Initiating auto-sync for folder: {f.folder_name} (ID: {f.id})")
+        asyncio.create_task(perform_sync_folder(f.id, SessionLocal))
+
+async def periodic_folder_sync():
+    """Background loop that periodically re-syncs all registered Google Drive folders every 30 minutes."""
+    while True:
+        try:
+            await asyncio.sleep(1800)  # Check every 30 minutes
+            print("[PERIODIC SYNC] Checking registered Google Drive folders for new content...")
+            db = SessionLocal()
+            try:
+                folders = db.query(DriveFolder).all()
+                for f in folders:
+                    asyncio.create_task(perform_sync_folder(f.id, SessionLocal))
+            finally:
+                db.close()
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            print(f"[PERIODIC SYNC] Error during periodic sync: {e}")
 
 def init_default_settings(db: SessionLocal):
     """Sync environment variables into system_settings if not already set or empty in DB."""
@@ -79,8 +100,10 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(enrich_all_missing_movies(SessionLocal))
     finally:
         db.close()
+    
+    sync_task = asyncio.create_task(periodic_folder_sync())
     yield
-    # Shutdown logic if any
+    sync_task.cancel()
 
 app = FastAPI(
     title="FilmsOverWeb - Cloud Cinema OTT",
