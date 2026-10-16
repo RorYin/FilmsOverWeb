@@ -754,6 +754,93 @@ class TestFilmsOverWeb(unittest.TestCase):
         db.commit()
         db.close()
 
+    def test_18_superadmin_tv_codes_and_24h_tv_login(self):
+        """Test SuperAdmin 5-digit TV code generation and 24-hour expiration on /tv-login."""
+        from app.models import TvLoginCode, User
+        from app.auth import decode_access_token, COOKIE_NAME
+
+        # 1. Test GET /tv-login renders the TV PIN entry screen
+        unauthed_client = TestClient(app)
+        get_resp = unauthed_client.get("/tv-login")
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertIn(b"tv-code-input", get_resp.content)
+        self.assertIn(b"remote-keypad", get_resp.content)
+        self.assertIn(b"24 hours", get_resp.content)
+
+        # 2. Test Guest cannot access SuperAdmin TV code generator
+        guest_client = TestClient(app)
+        guest_client.post("/login", data={"email": "guest@filmsoverweb.com", "password": "guest@123", "next": "/"})
+        guest_gen_resp = guest_client.post("/superadmin/tv-codes/generate", follow_redirects=False)
+        self.assertEqual(guest_gen_resp.status_code, 403)
+
+        # 3. SuperAdmin logs in and generates a 5-digit TV code
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={"email": "test@gmail.com", "password": "1q2w3e4r5t", "next": "/"})
+        gen_resp = admin_client.post("/superadmin/tv-codes/generate", follow_redirects=False)
+        self.assertEqual(gen_resp.status_code, 302)
+        location = gen_resp.headers.get("location", "")
+        self.assertIn("/superadmin/tv-codes?created=", location)
+        created_code = location.split("created=")[-1]
+        self.assertEqual(len(created_code), 5)
+        self.assertTrue(created_code.isdigit())
+
+        # Verify code exists in DB and is unused
+        db = SessionLocal()
+        tv_code_obj = db.query(TvLoginCode).filter(TvLoginCode.code == created_code).first()
+        self.assertIsNotNone(tv_code_obj)
+        self.assertFalse(tv_code_obj.is_used)
+        code_id = tv_code_obj.id
+        db.close()
+
+        # 4. Test submitting invalid code returns 400
+        tv_client = TestClient(app)
+        inv_resp = tv_client.post("/tv-login", data={"code": "00000"})
+        self.assertEqual(inv_resp.status_code, 400)
+        self.assertIn(b"Invalid or expired TV code", inv_resp.content)
+
+        # 5. Test submitting the valid 5-digit code
+        valid_resp = tv_client.post("/tv-login", data={"code": created_code}, follow_redirects=False)
+        self.assertEqual(valid_resp.status_code, 302)
+        self.assertEqual(valid_resp.headers.get("location"), "/")
+
+        # Verify auth cookie is set with exactly 24-hour expiration (86400 seconds)
+        cookie_header = valid_resp.headers.get("set-cookie", "")
+        self.assertIn(COOKIE_NAME, cookie_header)
+        self.assertIn("Max-Age=86400", cookie_header)
+
+        # Verify token payload has 24h expiration
+        token_str = valid_resp.cookies.get(COOKIE_NAME)
+        payload = decode_access_token(token_str)
+        self.assertIsNotNone(payload)
+        self.assertEqual(payload.get("sub"), "guest@filmsoverweb.com")
+        token_lifetime = payload.get("exp") - payload.get("iat", payload.get("exp") - 86400)
+        self.assertAlmostEqual(token_lifetime, 86400, delta=120)
+
+        # 6. Verify code is marked as used in DB
+        db = SessionLocal()
+        used_code_obj = db.query(TvLoginCode).filter(TvLoginCode.code == created_code).first()
+        self.assertTrue(used_code_obj.is_used)
+        self.assertIsNotNone(used_code_obj.used_at)
+        db.close()
+
+        # 7. Test that reusing the same code now fails
+        reused_client = TestClient(app)
+        reuse_resp = reused_client.post("/tv-login", data={"code": created_code})
+        self.assertEqual(reuse_resp.status_code, 400)
+        self.assertIn(b"Invalid or expired TV code", reuse_resp.content)
+
+        # 8. Test that active logged-in TV client accessing /tv-login is redirected to /
+        already_authed_resp = tv_client.get("/tv-login", follow_redirects=False)
+        self.assertEqual(already_authed_resp.status_code, 302)
+        self.assertEqual(already_authed_resp.headers.get("location"), "/")
+
+        # 9. SuperAdmin deletes the test code
+        del_resp = admin_client.post(f"/superadmin/tv-codes/{code_id}/delete", follow_redirects=False)
+        self.assertEqual(del_resp.status_code, 302)
+        db = SessionLocal()
+        self.assertIsNone(db.query(TvLoginCode).filter(TvLoginCode.id == code_id).first())
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Request, Depends, Form, HTTPException, BackgroundTasks, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from app.database import get_db, Session
-from app.models import User, SystemSetting
+import secrets
+from app.database import get_db, desc, Session
+from app.models import User, SystemSetting, TvLoginCode
 from app.config import settings
 from app.auth import get_current_user, require_role, get_password_hash
 from app.mailer import send_guest_welcome_email, get_smtp_config
@@ -218,3 +219,72 @@ async def delete_admin(
         db.delete(admin_to_del)
         db.commit()
     return RedirectResponse(url="/superadmin/admins", status_code=status.HTTP_302_FOUND)
+
+
+# --- 5-Digit TV Access Codes Management (Only SuperAdmin) ---
+
+def generate_unique_tv_code(db: Session) -> str:
+    """Generates an unguessable 5-digit numeric code from 10000 to 99999."""
+    for _ in range(200):
+        code_str = str(secrets.randbelow(90000) + 10000)
+        existing = db.query(TvLoginCode).filter(
+            TvLoginCode.code == code_str,
+            TvLoginCode.is_used == False
+        ).first()
+        if not existing:
+            return code_str
+    return str(secrets.randbelow(90000) + 10000)
+
+@router.get("/tv-codes", response_class=HTMLResponse)
+async def list_tv_codes(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(superadmin_only)
+):
+    codes = db.query(TvLoginCode).order_by(desc(TvLoginCode.created_at)).all()
+    created_code = request.query_params.get("created")
+    deleted = request.query_params.get("deleted") == "1"
+
+    active_count = len([c for c in codes if not c.is_used])
+    used_count = len([c for c in codes if c.is_used])
+
+    return templates.TemplateResponse(
+        request=request,
+        name="superadmin/tv_codes.html",
+        context={
+            "user": user,
+            "codes": codes,
+            "active_count": active_count,
+            "used_count": used_count,
+            "created_code": created_code,
+            "deleted": deleted
+        }
+    )
+
+@router.post("/tv-codes/generate")
+async def generate_tv_code_action(
+    db: Session = Depends(get_db),
+    user: User = Depends(superadmin_only)
+):
+    new_code = generate_unique_tv_code(db)
+    tv_code_obj = TvLoginCode(
+        code=new_code,
+        created_by_id=user.id,
+        is_used=False
+    )
+    db.add(tv_code_obj)
+    db.commit()
+    return RedirectResponse(url=f"/superadmin/tv-codes?created={new_code}", status_code=status.HTTP_302_FOUND)
+
+@router.post("/tv-codes/{code_id}/delete")
+async def delete_tv_code_action(
+    code_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(superadmin_only)
+):
+    code_to_del = db.query(TvLoginCode).filter(TvLoginCode.id == code_id).first()
+    if code_to_del:
+        db.delete(code_to_del)
+        db.commit()
+    return RedirectResponse(url="/superadmin/tv-codes?deleted=1", status_code=status.HTTP_302_FOUND)
+

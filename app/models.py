@@ -204,3 +204,18 @@ class WatchProgress(Base):
     def is_episode(self):
         return self.episode_id is not None
 
+
+class TvLoginCode(Base):
+    __tablename__ = "tv_login_codes"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(10), default="")  # 5-digit numeric code, e.g. "49201"
+    created_by_id = Column(Integer, default=None)
+    is_used = Column(Boolean, default=False)
+    used_at = Column(DateTime, default=None)
+    created_at = Column(DateTime, default=utc_now)
+
+    @property
+    def created_by(self):
+        return get_json_db().get_by_id(User, self.created_by_id)
+

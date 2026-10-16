@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}TV Access Codes - SuperAdmin Control Panel{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+
+    <!-- Header Section -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-brand-border">
+        <div>
+            <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                <span>SuperAdmin Restricted Area</span>
+            </div>
+            <h1 class="text-3xl font-extrabold text-white">5-Digit TV Access Codes</h1>
+            <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                Generate and manage single-use 5-digit TV access codes. When redeemed on Smart TVs via <code class="text-amber-400 bg-slate-900 px-1 py-0.5 rounded">/tv-login</code>, the session automatically expires after 24 hours.
+            </p>
+        </div>
+
+        <!-- Quick Stats Pill -->
+        <div class="flex items-center space-x-2">
+            <div class="bg-brand-surface border border-brand-border px-3.5 py-1.5 rounded-xl text-xs flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                <span class="text-slate-400">Active Unused:</span>
+                <span class="text-emerald-400 font-extrabold">{{ active_count }}</span>
+            </div>
+            <div class="bg-brand-surface border border-brand-border px-3.5 py-1.5 rounded-xl text-xs flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                <span class="text-slate-400">Redeemed:</span>
+                <span class="text-slate-300 font-extrabold">{{ used_count }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recently Generated Code Banner -->
+    {% if created_code %}
+    <div class="bg-gradient-to-r from-amber-500/20 via-amber-500/10 to-transparent border-2 border-amber-500/50 rounded-2xl p-6 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="flex items-center space-x-4 text-center md:text-left">
+            <div class="w-14 h-14 rounded-2xl bg-amber-500 text-black flex items-center justify-center flex-none shadow-lg shadow-amber-500/30">
+                <i data-lucide="tv" class="w-8 h-8"></i>
+            </div>
+            <div>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400">New TV Access Code Generated</span>
+                <p class="text-xs text-slate-300 mt-0.5">Share this 5-digit code with the user. It can be used once at <b>/tv-login</b> for a 24-hour guest session.</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <div class="bg-black/80 border-2 border-amber-400 text-amber-300 px-6 py-3 rounded-2xl font-mono text-3xl font-black tracking-widest shadow-inner select-all" id="generated-code-box">
+                {{ created_code }}
+            </div>
+            <button type="button" onclick="navigator.clipboard.writeText('{{ created_code }}'); this.innerText='Copied!';" class="bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-4 py-3 rounded-xl text-xs transition shadow-md cursor-pointer flex items-center space-x-1.5">
+                <i data-lucide="copy" class="w-4 h-4"></i>
+                <span>Copy</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if deleted %}
+    <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2">
+        <i data-lucide="check-circle" class="w-4 h-4 flex-none"></i>
+        <span>TV access code deleted/revoked successfully.</span>
+    </div>
+    {% endif %}
+
+    <!-- Generate Code Action Card -->
+    <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                <i data-lucide="key" class="w-5 h-5 text-amber-400"></i>
+                <span>Generate New TV Access Code</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">
+                Creates a unique 5-digit PIN that gives temporary 24-hour cinema streaming access.
+            </p>
+        </div>
+
+        <form method="POST" action="/superadmin/tv-codes/generate">
+            <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-6 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-lg shadow-amber-500/20 transition transform hover:scale-[1.02] cursor-pointer">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Generate 5-Digit Code</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- Codes List Table -->
+    <div class="bg-brand-surface border border-brand-border rounded-2xl overflow-hidden shadow-xl">
+        <div class="px-6 py-4 border-b border-brand-border flex items-center justify-between">
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                <i data-lucide="list" class="w-4 h-4 text-slate-400"></i>
+                <span>All TV Access Codes ({{ codes|length }})</span>
+            </h3>
+        </div>
+
+        {% if codes %}
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs sm:text-sm text-slate-300">
+                <thead class="bg-slate-900/60 uppercase text-[11px] font-bold tracking-wider text-slate-400 border-b border-brand-border">
+                    <tr>
+                        <th class="px-6 py-3.5">5-Digit Code</th>
+                        <th class="px-6 py-3.5">Status</th>
+                        <th class="px-6 py-3.5">Session Limit</th>
+                        <th class="px-6 py-3.5">Generated At</th>
+                        <th class="px-6 py-3.5">Redeemed At</th>
+                        <th class="px-6 py-3.5">Created By</th>
+                        <th class="px-6 py-3.5 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-brand-border">
+                    {% for c in codes %}
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="px-6 py-4">
+                            <span class="font-mono text-base font-extrabold tracking-widest px-3 py-1 rounded-lg border {% if c.is_used %}bg-slate-800 border-slate-700 text-slate-400 line-through{% else %}bg-amber-500/15 border-amber-500/40 text-amber-300{% endif %}">
+                                {{ c.code }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if c.is_used %}
+                            <span class="inline-flex items-center space-x-1 bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-0.5 rounded-full text-xs font-semibold">
+                                <i data-lucide="check-check" class="w-3.5 h-3.5 text-slate-500"></i>
+                                <span>Used / Redeemed</span>
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center space-x-1 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse mr-1"></span>
+                                <span>Active (Ready)</span>
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-xs font-semibold text-amber-400/90">
+                            24 Hours
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-400">
+                            {{ c.created_at.strftime('%b %d, %Y - %H:%M') if c.created_at else 'N/A' }}
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-400">
+                            {% if c.used_at %}
+                            <span class="text-slate-300">{{ c.used_at.strftime('%b %d, %Y - %H:%M') }}</span>
+                            {% else %}
+                            <span class="text-slate-500 italic">Not redeemed yet</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-400">
+                            {{ c.created_by.name or c.created_by.email if c.created_by else 'SuperAdmin' }}
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <form method="POST" action="/superadmin/tv-codes/{{ c.id }}/delete" onsubmit="return confirm('Revoke this TV access code?');" class="inline">
+                                <button type="submit" class="bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 p-1.5 rounded-lg transition" title="Delete Code">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-12 text-center space-y-3">
+            <div class="w-12 h-12 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                <i data-lucide="tv" class="w-6 h-6"></i>
+            </div>
+            <h4 class="text-base font-bold text-white">No TV Access Codes Generated</h4>
+            <p class="text-xs text-slate-400 max-w-sm mx-auto">
+                Click "Generate 5-Digit Code" above to create an access code for users logging in on Smart TVs.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

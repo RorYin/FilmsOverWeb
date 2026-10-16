@@ -203,7 +203,8 @@ class JsonDatabase:
             "series": [],
             "episodes": [],
             "system_settings": [],
-            "watch_progress": []
+            "watch_progress": [],
+            "tv_login_codes": []
         }
         self.load()
 
