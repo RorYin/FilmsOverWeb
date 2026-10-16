@@ -764,7 +764,7 @@ class TestFilmsOverWeb(unittest.TestCase):
         get_resp = unauthed_client.get("/tv-login")
         self.assertEqual(get_resp.status_code, 200)
         self.assertIn(b"tv-code-input", get_resp.content)
-        self.assertIn(b"remote-keypad", get_resp.content)
+        self.assertIn(b"tv-code-form", get_resp.content)
         self.assertIn(b"24 hours", get_resp.content)
 
         # 2. Test Guest cannot access SuperAdmin TV code generator

@@ -3,15 +3,15 @@
 {% block title %}TV Access - FilmsOverWeb Cinema{% endblock %}
 
 {% block content %}
-<div class="relative min-h-[85vh] flex items-center justify-center px-4 py-10">
-    <!-- Ambient ambient backdrop glow -->
+<div class="relative min-h-[85vh] flex items-center justify-center px-4 py-12">
+    <!-- Ambient backdrop glow -->
     <div class="absolute w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-3xl -z-10 pointer-events-none"></div>
 
-    <div class="w-full max-w-lg bg-brand-surface/95 border border-brand-border rounded-3xl shadow-2xl p-6 sm:p-8 backdrop-blur-xl">
+    <div class="w-full max-w-md bg-brand-surface/95 border border-brand-border rounded-3xl shadow-2xl p-8 backdrop-blur-xl">
         <!-- Brand / TV Header -->
-        <div class="text-center mb-6">
-            <div class="inline-flex p-3.5 bg-amber-500 rounded-2xl shadow-xl shadow-amber-500/25 mb-3">
-                <i data-lucide="tv" class="w-9 h-9 text-black"></i>
+        <div class="text-center mb-8">
+            <div class="inline-flex p-3.5 bg-amber-500 rounded-2xl shadow-xl shadow-amber-500/25 mb-3.5">
+                <i data-lucide="tv" class="w-10 h-10 text-black"></i>
             </div>
             <h1 class="text-2xl sm:text-3xl font-black text-white tracking-wide">
                 FILMS<span class="text-brand-red">OVER</span>WEB <span class="text-amber-400">TV</span>
@@ -19,26 +19,26 @@
             <p class="text-xs sm:text-sm text-slate-400 mt-1">
                 Enter your 5-digit PIN for 24 hours of cinema access
             </p>
-            <div class="mt-2 inline-flex items-center space-x-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3 py-1 rounded-full text-[11px] font-semibold">
+            <div class="mt-3 inline-flex items-center space-x-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-300 px-3.5 py-1 rounded-full text-[11px] font-semibold">
                 <i data-lucide="clock" class="w-3.5 h-3.5"></i>
                 <span>Session automatically expires after 24 hours</span>
             </div>
         </div>
 
         {% if error %}
-        <div class="mb-5 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2.5 shadow-sm">
+        <div class="mb-6 bg-rose-500/15 border border-rose-500/30 text-rose-300 px-4 py-3 rounded-xl text-xs flex items-center space-x-2.5 shadow-sm">
             <i data-lucide="alert-circle" class="w-4 h-4 flex-none text-rose-400"></i>
             <span>{{ error }}</span>
         </div>
         {% endif %}
 
         <!-- 5-Digit PIN Form -->
-        <form method="POST" action="/tv-login" id="tv-code-form" class="space-y-5">
+        <form method="POST" action="/tv-login" id="tv-code-form" class="space-y-6">
             <div>
-                <label for="tv-code-input" class="block text-center text-xs font-bold text-slate-300 uppercase tracking-widest mb-2">
+                <label for="tv-code-input" class="block text-center text-xs font-bold text-slate-300 uppercase tracking-widest mb-3">
                     Enter 5-Digit Access Code
                 </label>
-                <div class="relative max-w-xs mx-auto">
+                <div class="relative max-w-[280px] mx-auto">
                     <input type="text"
                            id="tv-code-input"
                            name="code"
@@ -49,36 +49,18 @@
                            inputmode="numeric"
                            pattern="[0-9]{5}"
                            placeholder="•••••"
-                           class="w-full text-center font-mono text-3xl sm:text-4xl font-black tracking-[0.5em] text-amber-300 bg-slate-900/90 border-2 border-brand-border focus:border-amber-400 rounded-2xl py-3 px-4 outline-none transition shadow-inner selection:bg-amber-500 selection:text-black">
+                           class="w-full text-center font-mono text-4xl sm:text-5xl font-black tracking-[0.4em] text-amber-300 bg-slate-900/95 border-2 border-brand-border focus:border-amber-400 focus:ring-4 focus:ring-amber-500/20 rounded-2xl py-4 px-3 outline-none transition shadow-inner selection:bg-amber-500 selection:text-black">
                 </div>
             </div>
 
-            <!-- On-Screen TV Remote Keypad (Perfect for TV Remote Navigation) -->
-            <div class="max-w-xs mx-auto grid grid-cols-3 gap-2 pt-1" id="remote-keypad">
-                {% for n in [1, 2, 3, 4, 5, 6, 7, 8, 9] %}
-                <button type="button" onclick="appendDigit('{{ n }}')" class="keypad-btn bg-slate-800/80 hover:bg-slate-700 active:bg-amber-500 active:text-black text-white font-mono text-xl font-bold py-2.5 rounded-xl border border-slate-700/80 hover:border-slate-500 transition shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400">
-                    {{ n }}
-                </button>
-                {% endfor %}
-                <button type="button" onclick="clearCode()" class="keypad-btn bg-slate-800/50 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 font-bold text-xs py-2.5 rounded-xl border border-slate-700/60 transition shadow cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-amber-400" title="Clear Code">
-                    Clear
-                </button>
-                <button type="button" onclick="appendDigit('0')" class="keypad-btn bg-slate-800/80 hover:bg-slate-700 active:bg-amber-500 active:text-black text-white font-mono text-xl font-bold py-2.5 rounded-xl border border-slate-700/80 hover:border-slate-500 transition shadow cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-400">
-                    0
-                </button>
-                <button type="button" onclick="backspaceDigit()" class="keypad-btn bg-slate-800/50 hover:bg-slate-700 text-slate-300 font-bold py-2.5 rounded-xl border border-slate-700/60 transition shadow cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-amber-400" title="Backspace">
-                    <i data-lucide="delete" class="w-4 h-4"></i>
-                </button>
-            </div>
-
-            <button type="submit" id="submit-btn" class="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-3.5 rounded-2xl shadow-xl shadow-amber-500/20 transition transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 text-base cursor-pointer">
+            <button type="submit" id="submit-btn" class="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-4 rounded-2xl shadow-xl shadow-amber-500/20 transition transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 text-base cursor-pointer">
                 <i data-lucide="unlock" class="w-5 h-5"></i>
                 <span>Unlock Cinema Access (24h)</span>
             </button>
         </form>
 
         <!-- Help / Manual Login Fallback -->
-        <div class="mt-6 pt-5 border-t border-brand-border/60 text-center space-y-2">
+        <div class="mt-8 pt-6 border-t border-brand-border/60 text-center space-y-2">
             <p class="text-xs text-slate-400">
                 Don't have a code? Request one from your system SuperAdmin.
             </p>
@@ -98,37 +80,17 @@
     const codeInput = document.getElementById('tv-code-input');
     const form = document.getElementById('tv-code-form');
 
-    function appendDigit(d) {
-        if (codeInput.value.length < 5) {
-            codeInput.value += d;
+    // Auto-focus the input on load
+    if (codeInput) {
+        codeInput.focus();
+        codeInput.addEventListener('input', () => {
+            // Filter to only digits and limit to 5
+            codeInput.value = codeInput.value.replace(/\D/g, '').slice(0, 5);
+            // Automatically submit as soon as all 5 digits are entered
             if (codeInput.value.length === 5) {
-                // Auto-focus submit button when 5 digits are entered
-                document.getElementById('submit-btn').focus();
+                form.submit();
             }
-        }
+        });
     }
-
-    function backspaceDigit() {
-        codeInput.value = codeInput.value.slice(0, -1);
-        codeInput.focus();
-    }
-
-    function clearCode() {
-        codeInput.value = '';
-        codeInput.focus();
-    }
-
-    // Physical TV Remote keypad support (digits 0-9, Backspace, Enter)
-    window.addEventListener('keydown', (e) => {
-        if (e.key >= '0' && e.key <= '9') {
-            if (document.activeElement !== codeInput) {
-                appendDigit(e.key);
-                e.preventDefault();
-            }
-        } else if (e.key === 'Backspace' && document.activeElement !== codeInput) {
-            backspaceDigit();
-            e.preventDefault();
-        }
-    });
 </script>
 {% endblock %}
