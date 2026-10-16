@@ -4,7 +4,7 @@
       "id": 2,
       "email": "test@gmail.com",
       "name": "Super Administrator",
-      "hashed_password": "$2b$12$3AyjDMExzSMLyLlZ/f.0N.TQz9MXq7sd4jxvhUF.dOHUjH9daji/.",
+      "hashed_password": "$2b$12$exefzcbEIlp1cC.7IdyauucT1I7OKCeciu/J6o20HD1R7jOPtMBCO",
       "role": "superadmin",
       "is_active": 1,
       "must_change_password": false,

@@ -8,33 +8,10 @@
     <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
     <link rel="alternate icon" href="/static/img/favicon.ico">
     <link rel="apple-touch-icon" href="/static/img/favicon.svg">
-    <!-- TailwindCSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            red: '#e5a00d',         /* Warm cinematic golden-yellow */
-                            redHover: '#c78707',
-                            yellow: '#e5a00d',
-                            yellowHover: '#c78707',
-                            accent: '#e5a00d',
-                            accentHover: '#c78707',
-                            blue: '#00a8e1',
-                            dark: '#0b0c0e',
-                            surface: '#14171f',
-                            border: '#222734'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Static Precompiled TailwindCSS for Smart TVs (webOS/Tizen) and modern browsers -->
+    <link rel="stylesheet" href="/static/css/tailwind.min.css">
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/js/lucide.min.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/style.css">
     {% block head %}{% endblock %}
@@ -220,6 +197,16 @@
                 });
             }
         })();
+
+        // LG webOS / Smart TV Remote Back Button handler (KeyCode: 461)
+        window.addEventListener('keydown', function(e) {
+            if (e.keyCode === 461 || e.key === 'Back') {
+                if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
+                    e.preventDefault();
+                    window.history.back();
+                }
+            }
+        });
     </script>
     {% block scripts %}{% endblock %}
 </body>
