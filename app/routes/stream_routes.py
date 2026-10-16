@@ -227,17 +227,16 @@ async def transmux_movie(
 
     # Generate internal auth token
     auth_token = create_access_token({"sub": user.email, "role": user.role})
-    port = request.url.port or 8000
-    host = request.url.hostname or "127.0.0.1"
-    raw_url = f"http://127.0.0.1:{port}/stream/raw/{movie.id}?token={auth_token}"
+    internal_port = os.environ.get("PORT", "8000")
+    raw_url = f"http://127.0.0.1:{internal_port}/stream/raw/{movie.id}?token={auth_token}"
 
     cmd = ["ffmpeg", "-v", "error"]
     if ss > 0.5:
         cmd.extend(["-noaccurate_seek", "-ss", f"{ss:.2f}"])
 
     cmd.extend([
-        "-probesize", "2M",
-        "-analyzeduration", "2M",
+        "-probesize", "1M",
+        "-analyzeduration", "1M",
         "-i", raw_url,
         "-c:v", "copy",
         "-c:a", "aac",
@@ -425,3 +424,122 @@ async def update_episode_watch_progress(
 
     db.commit()
     return JSONResponse({"status": "ok", "completed": completed})
+
+@router.get("/stream/transmux/episode/{episode_id}")
+async def transmux_episode(
+    episode_id: int,
+    request: Request,
+    ss: float = 0.0,
+    db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user_optional)
+):
+    """
+    Universal Episode Transmuxing Stream:
+    - Zero re-encoding for video (-c:v copy) -> 100% Full 4K HEVC / AV1 Lossless Quality
+    - Realtime audio transcoding (-c:a aac -ac 6 -b:a 384k) -> Full Dolby 5.1, E-AC3, DTS, TrueHD
+    - Remuxes MKV -> Fragmented MP4 for 100% native browser compatibility
+    - Fast playhead seeking via ?ss={seconds}
+    """
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    episode = db.query(Episode).filter(Episode.id == episode_id).first()
+    if not episode:
+        raise HTTPException(status_code=404, detail="Episode not found")
+
+    auth_token = create_access_token({"sub": user.email, "role": user.role})
+    internal_port = os.environ.get("PORT", "8000")
+    raw_url = f"http://127.0.0.1:{internal_port}/stream/episode/raw/{episode.id}?token={auth_token}"
+
+    cmd = ["ffmpeg", "-v", "error"]
+    if ss > 0.5:
+        cmd.extend(["-noaccurate_seek", "-ss", f"{ss:.2f}"])
+
+    cmd.extend([
+        "-probesize", "1M",
+        "-analyzeduration", "1M",
+        "-i", raw_url,
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-ac", "6",
+        "-b:a", "384k",
+        "-avoid_negative_ts", "make_zero",
+        "-f", "mp4",
+        "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+        "pipe:1"
+    ])
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=256 * 1024
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to start ffmpeg remuxer: {e}")
+
+    async def ffmpeg_stream_generator():
+        loop = asyncio.get_event_loop()
+        try:
+            while True:
+                chunk = await loop.run_in_executor(None, proc.stdout.read, 128 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        except (asyncio.CancelledError, GeneratorExit):
+            pass
+        except Exception as err:
+            print(f"[TRANSMUX EPISODE] Stream interrupted: {err}")
+        finally:
+            try:
+                if proc.poll() is None:
+                    proc.kill()
+                    await loop.run_in_executor(None, proc.wait)
+            except Exception:
+                pass
+
+    return StreamingResponse(
+        ffmpeg_stream_generator(),
+        media_type="video/mp4",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
+@router.get("/stream/playlist/episode/{episode_id}.m3u")
+async def generate_vlc_episode_m3u(
+    episode_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Generates an M3U playlist file for 1-click native VLC / MPV / PotPlayer streaming for an episode."""
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    episode = db.query(Episode).filter(Episode.id == episode_id).first()
+    if not episode:
+        raise HTTPException(status_code=404, detail="Episode not found")
+
+    auth_token = create_access_token({"sub": user.email, "role": user.role})
+    base_url = str(request.base_url).rstrip("/")
+    stream_url = f"{base_url}/stream/episode/raw/{episode.id}?token={auth_token}"
+
+    clean_title = "".join(c for c in (episode.title or f"Episode {episode.episode_number}") if c.isalnum() or c in (" ", "-", "_")).strip()
+    m3u_content = (
+        f"#EXTM3U\n"
+        f"#EXTINF:-1,S{episode.season_number:02d}E{episode.episode_number:02d} - {clean_title}\n"
+        f"{stream_url}\n"
+    )
+
+    return Response(
+        content=m3u_content,
+        media_type="audio/x-mpegurl",
+        headers={
+            "Content-Disposition": f'attachment; filename="S{episode.season_number:02d}E{episode.episode_number:02d}_{clean_title}.m3u"'
+        }
+    )
+

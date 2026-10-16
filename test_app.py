@@ -578,6 +578,76 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertEqual(change_post_resp.status_code, 400)
         self.assertIn(b"Password cannot be changed for the default guest account", change_post_resp.content)
 
+    def test_16_player_engine_endpoints(self):
+        """Test that watch pages render the Playback Engine switcher, native player, and M3U playlists."""
+        from app.models import Movie, Series, Episode
+        db = SessionLocal()
+        movie = db.query(Movie).first()
+        if not movie:
+            movie = Movie(
+                title="Test 10-bit HEVC Movie",
+                file_name="Test.Movie.2024.2160p.10bit.HEVC.mkv",
+                codec="HEVC",
+                resolution="4K UHD",
+                gdrive_file_id="test_gdrive_movie_id"
+            )
+            db.add(movie)
+            db.commit()
+
+        episode = db.query(Episode).first()
+        if not episode:
+            series = db.query(Series).first()
+            if not series:
+                series = Series(title="Test Player Series")
+                db.add(series)
+                db.commit()
+            episode = Episode(
+                series_id=series.id,
+                title="Test Player Episode",
+                file_name="Test.S01E01.mkv",
+                gdrive_file_id="test_gdrive_ep_id"
+            )
+            db.add(episode)
+            db.commit()
+
+        movie_id = movie.id
+        episode_id = episode.id
+        db.close()
+
+        client = TestClient(app)
+        # Login as guest to access watch page
+        client.post("/login", data={"email": "guest@filmsoverweb.com", "password": "guest@123", "next": "/"})
+        
+        # Test movie watch page contains engine switcher, movi-player with sw="false", and native player
+        watch_resp = client.get(f"/watch/{movie_id}")
+        self.assertEqual(watch_resp.status_code, 200)
+        self.assertIn(b'id="engine-btn"', watch_resp.content)
+        self.assertIn(b'sw="false"', watch_resp.content)
+        self.assertIn(b'fallback="native"', watch_resp.content)
+        self.assertIn(b'id="native-player"', watch_resp.content)
+        self.assertIn(b'switchPlayerEngine', watch_resp.content)
+
+        # Test episode watch page contains engine switcher, movi-player with sw="false", and native player
+        watch_ep_resp = client.get(f"/watch/episode/{episode_id}")
+        self.assertEqual(watch_ep_resp.status_code, 200)
+        self.assertIn(b'id="engine-btn"', watch_ep_resp.content)
+        self.assertIn(b'sw="false"', watch_ep_resp.content)
+        self.assertIn(b'fallback="native"', watch_ep_resp.content)
+        self.assertIn(b'id="native-player"', watch_ep_resp.content)
+        self.assertIn(b'switchPlayerEngine', watch_ep_resp.content)
+
+        # Test movie M3U playlist endpoint
+        m3u_resp = client.get(f"/stream/playlist/{movie_id}.m3u")
+        self.assertEqual(m3u_resp.status_code, 200)
+        self.assertIn(b"#EXTM3U", m3u_resp.content)
+        self.assertIn(f"/stream/{movie_id}?token=".encode(), m3u_resp.content)
+
+        # Test episode M3U playlist endpoint
+        ep_m3u_resp = client.get(f"/stream/playlist/episode/{episode_id}.m3u")
+        self.assertEqual(ep_m3u_resp.status_code, 200)
+        self.assertIn(b"#EXTM3U", ep_m3u_resp.content)
+        self.assertIn(f"/stream/episode/raw/{episode_id}?token=".encode(), ep_m3u_resp.content)
+
 if __name__ == "__main__":
     unittest.main()
 

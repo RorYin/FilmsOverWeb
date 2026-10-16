@@ -474,6 +474,20 @@
                 return;
             }
 
+            const engineDropdown = document.getElementById('engine-dropdown');
+            if (engineDropdown && !engineDropdown.classList.contains('hidden')) {
+                e.preventDefault();
+                engineDropdown.classList.add('hidden');
+                return;
+            }
+
+            const epDropdown = document.getElementById('ep-dropdown');
+            if (epDropdown && !epDropdown.classList.contains('hidden')) {
+                e.preventDefault();
+                epDropdown.classList.add('hidden');
+                return;
+            }
+
             // If not on homepage or login, navigate back in browser history
             if (window.location.pathname !== '/' && window.location.pathname !== '/login') {
                 e.preventDefault();
