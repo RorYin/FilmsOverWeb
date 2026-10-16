@@ -6,7 +6,7 @@
 <div class="relative pb-16">
 
     {% if request.query_params.get('password_changed') == '1' %}
-    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+    <div class="w-[90%] mx-auto px-2 sm:px-4 pt-4">
         <div class="bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 px-5 py-3.5 rounded-2xl text-xs sm:text-sm flex items-center justify-between shadow-xl">
             <div class="flex items-center space-x-2.5">
                 <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400 flex-none"></i>
@@ -30,8 +30,8 @@
             <div class="absolute inset-0 hero-gradient"></div>
             <div class="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-transparent to-black/40"></div>
 
-            <!-- Hero Content Text Overlay -->
-            <div class="absolute bottom-14 left-0 right-0 w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 z-10">
+            <!-- Hero Content Text Overlay (Aligned to 90% container) -->
+            <div class="absolute bottom-14 left-0 right-0 w-[90%] mx-auto px-2 sm:px-4 z-10">
                 <div class="max-w-2xl space-y-4">
                     <!-- Badges -->
                     <div class="flex flex-wrap items-center gap-2">
@@ -92,8 +92,8 @@
             <i data-lucide="chevron-right" class="w-6 h-6"></i>
         </button>
 
-        <!-- Slide Indicators / Dots -->
-        <div class="absolute bottom-5 right-8 z-20 flex items-center space-x-2">
+        <!-- Slide Indicators / Dots (Aligned to 90% boundary) -->
+        <div class="absolute bottom-5 right-[5%] z-20 flex items-center space-x-2">
             {% for movie in hero_movies %}
             <button type="button" class="hero-dot h-1.5 rounded-full transition-all duration-300 cursor-pointer {% if loop.first %}w-7 bg-brand-red{% else %}w-2 bg-white/40 hover:bg-white/70{% endif %}" data-dot-index="{{ loop.index0 }}" aria-label="Go to slide {{ loop.index }}"></button>
             {% endfor %}
@@ -102,7 +102,7 @@
     </div>
     {% else %}
     <!-- Empty State Banner -->
-    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+    <div class="w-[90%] mx-auto px-2 sm:px-4 py-20 text-center">
         <div class="inline-flex p-4 bg-brand-surface rounded-2xl border border-brand-border mb-6">
             <i data-lucide="film" class="w-16 h-16 text-brand-red"></i>
         </div>
@@ -121,8 +121,8 @@
     </div>
     {% endif %}
 
-    <!-- Carousel Rails (Expanded to 90% full page width) -->
-    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 space-y-12 {% if hero_movies %}-mt-10 z-20 relative{% endif %}">
+    <!-- Carousel Rails (90% width across the page) -->
+    <div class="w-[90%] mx-auto px-2 sm:px-4 space-y-10 {% if hero_movies %}-mt-10 z-20 relative{% endif %}">
 
         <!-- Continue Watching (if present) -->
         {% if continue_watching %}

@@ -19,7 +19,7 @@
     display: flex;
     overflow-x: auto;
     scroll-behavior: smooth;
-    gap: 1.25rem;
+    gap: 1.125rem;
     padding-bottom: 1.5rem;
     scrollbar-width: thin;
     scrollbar-color: #222734 transparent;
@@ -38,30 +38,31 @@
     background: #e5a00d;
 }
 
+/* Reduced tile sizes by 10% */
 .carousel-track > .movie-tile,
 .carousel-track > .series-tile {
-    flex: 0 0 10.5rem;
-    width: 10.5rem;
+    flex: 0 0 9.45rem;
+    width: 9.45rem;
 }
 @media (min-width: 640px) {
     .carousel-track > .movie-tile,
     .carousel-track > .series-tile {
-        flex: 0 0 12.5rem;
-        width: 12.5rem;
+        flex: 0 0 11.25rem;
+        width: 11.25rem;
     }
 }
 @media (min-width: 1024px) {
     .carousel-track > .movie-tile,
     .carousel-track > .series-tile {
-        flex: 0 0 14rem;
-        width: 14rem;
+        flex: 0 0 12.6rem;
+        width: 12.6rem;
     }
 }
 @media (min-width: 1440px) {
     .carousel-track > .movie-tile,
     .carousel-track > .series-tile {
-        flex: 0 0 15.5rem;
-        width: 15.5rem;
+        flex: 0 0 13.95rem;
+        width: 13.95rem;
     }
 }
 
@@ -75,10 +76,11 @@
     z-index: 20;
 }
 
-/* Hero Billboard Gradient Overlay */
+/* Hero Billboard Gradient Overlay (Sides faded, full width) */
 .hero-gradient {
     background: linear-gradient(0deg, #0b0c0e 0%, rgba(11, 12, 14, 0.8) 25%, rgba(11, 12, 14, 0.2) 60%, rgba(11, 12, 14, 0.9) 100%),
-                linear-gradient(90deg, #0b0c0e 0%, rgba(11, 12, 14, 0.85) 35%, rgba(11, 12, 14, 0) 70%);
+                linear-gradient(90deg, #0b0c0e 0%, rgba(11, 12, 14, 0.85) 30%, rgba(11, 12, 14, 0) 65%),
+                linear-gradient(270deg, #0b0c0e 0%, rgba(11, 12, 14, 0.8) 18%, transparent 40%);
 }
 
 .hero-vignette {
