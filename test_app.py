@@ -656,19 +656,23 @@ class TestFilmsOverWeb(unittest.TestCase):
         # Login as guest to access watch page
         client.post("/login", data={"email": "guest@filmsoverweb.com", "password": "guest@123", "next": "/"})
         
-        # Test movie watch page contains pure WASM movi-player with sw="auto" and no engine switcher dropdown
+        # Test movie watch page contains pure WASM movi-player with sw="false", hdr, fastseek and no engine switcher dropdown
         watch_resp = client.get(f"/watch/{movie_id}")
         self.assertEqual(watch_resp.status_code, 200)
         self.assertIn(b'movi-player', watch_resp.content)
-        self.assertIn(b'sw="auto"', watch_resp.content)
+        self.assertIn(b'sw="false"', watch_resp.content)
+        self.assertIn(b'hdr', watch_resp.content)
+        self.assertIn(b'fastseek', watch_resp.content)
         self.assertNotIn(b'id="engine-btn"', watch_resp.content)
         self.assertNotIn(b'id="native-player"', watch_resp.content)
 
-        # Test episode watch page contains pure WASM movi-player with sw="auto" and no engine switcher dropdown
+        # Test episode watch page contains pure WASM movi-player with sw="false", hdr, fastseek and no engine switcher dropdown
         watch_ep_resp = client.get(f"/watch/episode/{episode_id}")
         self.assertEqual(watch_ep_resp.status_code, 200)
         self.assertIn(b'movi-player', watch_ep_resp.content)
-        self.assertIn(b'sw="auto"', watch_ep_resp.content)
+        self.assertIn(b'sw="false"', watch_ep_resp.content)
+        self.assertIn(b'hdr', watch_ep_resp.content)
+        self.assertIn(b'fastseek', watch_ep_resp.content)
         self.assertNotIn(b'id="engine-btn"', watch_ep_resp.content)
         self.assertNotIn(b'id="native-player"', watch_ep_resp.content)
 
