@@ -86,18 +86,18 @@
                          preload="auto"
                          class="w-full h-full block">
             </movi-player>
-            <!-- Stream Error & Fallback Banner -->
+            <!-- Stream Error Banner -->
             <div id="stream-error-banner" class="hidden absolute inset-0 z-40 bg-slate-950/90 backdrop-blur flex flex-col items-center justify-center p-6 text-center space-y-4">
                 <div class="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
                     <i data-lucide="alert-triangle" class="w-7 h-7"></i>
                 </div>
                 <div class="space-y-1.5 max-w-md">
-                    <h3 class="text-base font-bold text-white" id="stream-error-title">Stream Loading Issue</h3>
+                    <h3 class="text-base font-bold text-white" id="stream-error-title">Stream Playback Issue</h3>
                     <p class="text-xs text-slate-300" id="stream-error-msg">The video took too long to load or Google Drive's download quota was reached.</p>
                 </div>
                 <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
-                    <button id="btn-force-server" type="button" class="px-4 py-2 bg-brand-red hover:bg-brand-redHover text-black text-xs font-bold rounded-xl transition cursor-pointer">
-                        Stream via Backend Server
+                    <button id="btn-retry-stream" type="button" class="px-4 py-2 bg-brand-red hover:bg-brand-redHover text-black text-xs font-bold rounded-xl transition cursor-pointer">
+                        Retry Playback
                     </button>
                     <a href="/movies" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
                         Back to Movies
@@ -122,11 +122,13 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const cfWorkerUrl = "{{ cloudflare_worker_url or '' }}".trim().replace(/\/+$/, '');
+        let cfWorkerUrl = "{{ cloudflare_worker_url or '' }}".trim().replace(/\/+$/, '');
+        if (cfWorkerUrl && !cfWorkerUrl.startsWith('http://') && !cfWorkerUrl.startsWith('https://')) {
+            cfWorkerUrl = 'https://' + cfWorkerUrl;
+        }
         const gdriveFileId = "{{ movie.gdrive_file_id }}";
         const googleApiKey = "{{ google_api_key or '' }}".trim();
         const fileName = "{{ movie.file_name }}";
-        const userToken = "{{ user_token }}";
         const initialPosition = parseFloat("{{ initial_time }}") || 0;
         const totalDuration = parseFloat("{{ (movie.duration or 0) * 60 }}") || 0;
         const qualityVersions = {{ quality_versions|tojson|safe if quality_versions else '[]' }};
@@ -139,7 +141,7 @@
         const errorBanner = document.getElementById('stream-error-banner');
         const errorTitle = document.getElementById('stream-error-title');
         const errorMsg = document.getElementById('stream-error-msg');
-        const btnForceServer = document.getElementById('btn-force-server');
+        const btnRetryStream = document.getElementById('btn-retry-stream');
 
         function showStreamError(title, msg) {
             if (errorBanner) {
@@ -150,67 +152,57 @@
             }
         }
 
-        if (btnForceServer) {
-            btnForceServer.addEventListener('click', () => {
+        if (btnRetryStream) {
+            btnRetryStream.addEventListener('click', () => {
                 if (errorBanner) errorBanner.classList.add('hidden');
-                fallbackAttempted = true;
-                const serverUrl = buildStreamUrl(currentMovieId, currentGdriveId, currentFileName, true);
-                moviPlayer.setAttribute('src', serverUrl);
+                const streamUrl = buildStreamUrl(currentGdriveId, currentFileName);
+                moviPlayer.setAttribute('src', streamUrl);
                 if (typeof moviPlayer.load === 'function') {
                     moviPlayer.load().catch(() => {});
                 }
             });
         }
 
-        function buildStreamUrl(movieIdParam, fileIdParam, fileNameParam, forceDirect = false) {
-            if (cfWorkerUrl && !forceDirect) {
+        // Direct client-side streaming: 100% runs on client, host bandwidth is never used
+        function buildStreamUrl(fileIdParam, fileNameParam) {
+            if (cfWorkerUrl) {
                 let u = `${cfWorkerUrl}/?file_id=${encodeURIComponent(fileIdParam)}&name=${encodeURIComponent(fileNameParam)}`;
                 if (googleApiKey) u += `&key=${encodeURIComponent(googleApiKey)}`;
                 return u;
             }
-            return `/stream/raw/${movieIdParam}?token=${encodeURIComponent(userToken)}`;
+            if (googleApiKey) {
+                return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileIdParam)}?alt=media&key=${encodeURIComponent(googleApiKey)}`;
+            }
+            return `https://drive.usercontent.google.com/download?id=${encodeURIComponent(fileIdParam)}&export=download&confirm=t`;
         }
 
         // Initialize WASM Player
-        const initialWasmUrl = buildStreamUrl(currentMovieId, currentGdriveId, currentFileName);
+        const initialWasmUrl = buildStreamUrl(currentGdriveId, currentFileName);
         moviPlayer.setAttribute('src', initialWasmUrl);
 
-        // Auto-fallback from Cloudflare Worker to local server stream if worker network fails
-        let fallbackAttempted = false;
-        function tryFallbackStream(e) {
-            if (cfWorkerUrl && !fallbackAttempted) {
-                fallbackAttempted = true;
-                console.warn("[Stream] Cloudflare Worker stream error or quota limit. Switching to backend server stream...");
-                const serverUrl = buildStreamUrl(currentMovieId, currentGdriveId, currentFileName, true);
-                moviPlayer.setAttribute('src', serverUrl);
-                if (typeof moviPlayer.load === 'function') {
-                    moviPlayer.load().catch(() => {});
-                }
+        function handleStreamError(e) {
+            console.warn("[Stream] movi-player stream error:", e);
+            if (cfWorkerUrl) {
+                showStreamError(
+                    "Playback Issue",
+                    "The video stream could not be loaded via Cloudflare Worker. Please check your network connection or Cloudflare Worker configuration."
+                );
             } else {
                 showStreamError(
                     "Google Drive Quota Exceeded",
-                    "This video has temporarily hit Google Drive's 24-hour public download quota. To enable high-bandwidth streaming without limits, add a Google Service Account in SuperAdmin Settings."
+                    "This video has temporarily hit Google Drive's 24-hour public download quota. To enable high-bandwidth streaming without limits, configure a Cloudflare Worker Stream URL in SuperAdmin Settings."
                 );
             }
         }
 
-        moviPlayer.addEventListener('error', tryFallbackStream);
-        moviPlayer.addEventListener('mediaerror', tryFallbackStream);
+        moviPlayer.addEventListener('error', handleStreamError);
+        moviPlayer.addEventListener('mediaerror', handleStreamError);
         moviPlayer.addEventListener('errordisplay', (e) => {
             console.warn("[Stream] movi-player errordisplay:", e.detail);
-            tryFallbackStream(e);
+            handleStreamError(e);
         });
 
-        // If player is stalled/empty for more than 10 seconds without metadata, trigger fallback
-        const loadWatchdog = setTimeout(() => {
-            if (!moviPlayer.duration && !moviPlayer.currentTime && !fallbackAttempted && cfWorkerUrl) {
-                console.warn("[Stream] Player took too long to load initial metadata. Triggering server stream fallback...");
-                tryFallbackStream();
-            }
-        }, 10000);
-
         moviPlayer.addEventListener('loadedmetadata', () => {
-            clearTimeout(loadWatchdog);
             if (errorBanner) errorBanner.classList.add('hidden');
         }, { once: true });
 
@@ -260,7 +252,7 @@
             // Update browser URL without reloading page
             window.history.replaceState(null, '', `/watch/${targetId}`);
 
-            moviPlayer.setAttribute('src', buildStreamUrl(targetId, currentGdriveId, currentFileName));
+            moviPlayer.setAttribute('src', buildStreamUrl(currentGdriveId, currentFileName));
             moviPlayer.addEventListener('loadedmetadata', () => {
                 if (currentTotal > 0) {
                     moviPlayer.currentTime = currentTotal;
