@@ -39,6 +39,8 @@ async def settings_view(
         "google_api_key": get_setting_val("google_api_key", db, settings.GOOGLE_API_KEY),
         "google_service_account_json": get_setting_val("google_service_account_json", db, settings.GOOGLE_SERVICE_ACCOUNT_JSON),
         "cloudflare_worker_url": get_setting_val("cloudflare_worker_url", db, settings.CLOUDFLARE_WORKER_URL),
+        "cloudflare_mail_worker_url": get_setting_val("cloudflare_mail_worker_url", db, getattr(settings, "CLOUDFLARE_MAIL_WORKER_URL", "")),
+        "cloudflare_mail_worker_secret": get_setting_val("cloudflare_mail_worker_secret", db, getattr(settings, "CLOUDFLARE_MAIL_WORKER_SECRET", "")),
         "resend_api_key": get_setting_val("resend_api_key", db, getattr(settings, "RESEND_API_KEY", "")),
         "resend_from_email": get_setting_val("resend_from_email", db, getattr(settings, "RESEND_FROM_EMAIL", "")),
         "smtp_host": get_setting_val("smtp_host", db, getattr(settings, "SMTP_HOST", "smtp.gmail.com")),
@@ -68,6 +70,8 @@ async def save_settings(
     google_api_key: str = Form(""),
     google_service_account_json: str = Form(""),
     cloudflare_worker_url: str = Form(""),
+    cloudflare_mail_worker_url: str = Form(""),
+    cloudflare_mail_worker_secret: str = Form(""),
     resend_api_key: str = Form(""),
     resend_from_email: str = Form(""),
     smtp_host: str = Form("smtp.gmail.com"),
@@ -82,6 +86,8 @@ async def save_settings(
     set_setting_val("google_api_key", google_api_key.strip(), db)
     set_setting_val("google_service_account_json", google_service_account_json.strip(), db)
     set_setting_val("cloudflare_worker_url", cloudflare_worker_url.strip().rstrip("/"), db)
+    set_setting_val("cloudflare_mail_worker_url", cloudflare_mail_worker_url.strip().rstrip("/"), db)
+    set_setting_val("cloudflare_mail_worker_secret", cloudflare_mail_worker_secret.strip(), db)
     set_setting_val("resend_api_key", resend_api_key.strip(), db)
     set_setting_val("resend_from_email", resend_from_email.strip(), db)
     set_setting_val("smtp_host", smtp_host.strip(), db)
@@ -129,6 +135,8 @@ async def test_email(
         "google_api_key": get_setting_val("google_api_key", db, ""),
         "google_service_account_json": get_setting_val("google_service_account_json", db, ""),
         "cloudflare_worker_url": get_setting_val("cloudflare_worker_url", db, settings.CLOUDFLARE_WORKER_URL),
+        "cloudflare_mail_worker_url": get_setting_val("cloudflare_mail_worker_url", db, getattr(settings, "CLOUDFLARE_MAIL_WORKER_URL", "")),
+        "cloudflare_mail_worker_secret": get_setting_val("cloudflare_mail_worker_secret", db, getattr(settings, "CLOUDFLARE_MAIL_WORKER_SECRET", "")),
         "resend_api_key": get_setting_val("resend_api_key", db, getattr(settings, "RESEND_API_KEY", "")),
         "resend_from_email": get_setting_val("resend_from_email", db, getattr(settings, "RESEND_FROM_EMAIL", "")),
         "smtp_host": get_setting_val("smtp_host", db, "smtp.gmail.com"),

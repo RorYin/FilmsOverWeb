@@ -469,6 +469,38 @@ class TestFilmsOverWeb(unittest.TestCase):
 
         # Clean up test setting
         set_setting_val("resend_api_key", "", db)
+
+        # 3. Test Cloudflare Mail Worker HTTPS dispatch when cloudflare_mail_worker_url is provided
+        mock_cf_resp = MagicMock()
+        mock_cf_resp.status_code = 200
+        mock_cf_resp.json.return_value = {"success": True, "message": "Email sent"}
+
+        set_setting_val("cloudflare_mail_worker_url", "https://mailer.example.workers.dev", db)
+        set_setting_val("cloudflare_mail_worker_secret", "secret_pass_123", db)
+        set_setting_val("smtp_user", "sender@gmail.com", db)
+        set_setting_val("smtp_password", "apppass1234", db)
+
+        with patch("httpx.post", return_value=mock_cf_resp) as mock_cf_post:
+            ok, msg = send_guest_welcome_email(
+                guest_email="cf_guest@example.com",
+                guest_name="CF Guest",
+                password="TestPassWord!1",
+                login_url="http://localhost:8000/login",
+                db=db
+            )
+            self.assertTrue(ok)
+            self.assertIn("Cloudflare Mail Worker", msg)
+            self.assertTrue(mock_cf_post.called)
+            args, kwargs = mock_cf_post.call_args
+            self.assertEqual(args[0], "https://mailer.example.workers.dev")
+            self.assertEqual(kwargs["json"]["to"], "cf_guest@example.com")
+            self.assertEqual(kwargs["json"]["smtp_user"], "sender@gmail.com")
+            self.assertEqual(kwargs["json"]["smtp_pass"], "apppass1234")
+            self.assertEqual(kwargs["json"]["secret"], "secret_pass_123")
+
+        # Clean up test settings
+        set_setting_val("cloudflare_mail_worker_url", "", db)
+        set_setting_val("cloudflare_mail_worker_secret", "", db)
         db.close()
 
     def test_13_stream_gdrive_quota_html_detection(self):

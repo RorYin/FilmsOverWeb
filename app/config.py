@@ -50,7 +50,9 @@ class AppConfig(BaseModel):
     # Cloudflare Stream Worker (Option B: Zero-Bandwidth Direct Client Streaming)
     CLOUDFLARE_WORKER_URL: str = _resolve_env_var(("CLOUDFLARE_WORKER_URL", "CLOUDFLAREWORKERURL", "CloudflareWorkerUrl", "CF_WORKER_URL"), "")
 
-    # Email Automation Defaults (Resend HTTPS API or Gmail SMTP)
+    # Email Automation Defaults (Cloudflare Mail Worker, Resend HTTPS API or Gmail SMTP)
+    CLOUDFLARE_MAIL_WORKER_URL: str = _resolve_env_var(("CLOUDFLARE_MAIL_WORKER_URL", "CLOUDFLAREMAILWORKERURL", "CF_MAIL_WORKER_URL"), "")
+    CLOUDFLARE_MAIL_WORKER_SECRET: str = _resolve_env_var(("CLOUDFLARE_MAIL_WORKER_SECRET", "CLOUDFLAREMAILWORKERSECRET", "CF_MAIL_WORKER_SECRET"), "")
     RESEND_API_KEY: str = _resolve_env_var(("RESEND_API_KEY", "RESENDAPIKEY", "ResendApiKey"), "")
     RESEND_FROM_EMAIL: str = _resolve_env_var(("RESEND_FROM_EMAIL", "RESENDFROMEMAIL", "ResendFromEmail"), "")
     SMTP_HOST: str = _resolve_env_var(("SMTP_HOST", "SMTPHOST"), "smtp.gmail.com")

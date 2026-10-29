@@ -176,16 +176,47 @@
                     <p class="font-bold text-blue-300">Why did you see "[Errno 101] Network is unreachable" on Render?</p>
                     <p class="text-slate-300 leading-relaxed">
                         Render explicitly <strong>blocks outbound network traffic on standard SMTP ports (25, 465, and 587)</strong> on all free tier accounts to prevent spam.
-                        Standard HTTPS on <strong>Port 443</strong> is 100% open. We support <strong>Resend API</strong> below, which connects over HTTPS Port 443 and is <strong>never blocked</strong> by Render!
+                        Standard HTTPS on <strong>Port 443</strong> is 100% open. We support <strong>Cloudflare Mail Worker</strong> (Option A) and <strong>Resend API</strong> (Option B) below, both of which connect over HTTPS Port 443 and are <strong>never blocked</strong> by Render!
                     </p>
                 </div>
             </div>
 
-            <!-- Option A: Resend HTTPS API (Recommended for Render) -->
+            <!-- Option A: Cloudflare Mail Worker Relay (Recommended for Render Free Tier - Zero Third-Party SaaS) -->
+            <div class="bg-slate-900/60 border border-brand-red/40 rounded-xl p-4 space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-black bg-brand-red px-2 py-0.5 rounded">Option A (Recommended)</span>
+                        <span class="text-xs font-bold text-white">Cloudflare Mail Worker Relay (HTTPS Port 443)</span>
+                    </div>
+                    <span class="text-[11px] text-amber-400 font-medium">100% Free &bull; Zero External SaaS</span>
+                </div>
+                <p class="text-[12px] text-slate-300 leading-relaxed">
+                    Uses your own private Cloudflare Worker as an HTTPS bridge. FilmsOverWeb sends email requests over HTTPS (Port 443), and the worker opens a secure TLS socket to <strong>smtp.gmail.com:465</strong> using your Gmail address and Google App Password (entered in Option C below).
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Cloudflare Mail Worker URL
+                        </label>
+                        <input type="url" name="cloudflare_mail_worker_url" value="{{ settings.cloudflare_mail_worker_url }}" placeholder="https://filmsoverweb-mailer.your-subdomain.workers.dev" class="w-full bg-slate-900 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                        <p class="text-[11px] text-slate-500 mt-1">If set, FilmsOverWeb dispatches emails via this Cloudflare Worker over Port 443.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+                            Worker Shared Secret (Optional)
+                        </label>
+                        <input type="password" name="cloudflare_mail_worker_secret" value="{{ settings.cloudflare_mail_worker_secret }}" placeholder="Optional secret matching MAILER_SECRET in worker" class="w-full bg-slate-900 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
+                        <p class="text-[11px] text-slate-500 mt-1">If configured in your Worker as <code class="bg-slate-800 px-1 py-0.5 rounded text-amber-300">MAILER_SECRET</code>, paste it here.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Option B: Resend HTTPS API -->
             <div class="bg-slate-900/60 border border-emerald-500/30 rounded-xl p-4 space-y-3">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800">
                     <div class="flex items-center space-x-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">Option A (Recommended for Render Free Tier)</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded">Option B</span>
                         <span class="text-xs font-bold text-white">Resend HTTPS API (Port 443)</span>
                     </div>
                     <a href="https://resend.com/api-keys" target="_blank" class="text-xs text-emerald-400 hover:underline flex items-center space-x-1">
@@ -202,7 +233,7 @@
                             <a href="https://resend.com" target="_blank" class="text-emerald-400 hover:underline normal-case text-[11px] font-normal ml-2">resend.com &nearr;</a>
                         </label>
                         <input type="password" name="resend_api_key" value="{{ settings.resend_api_key }}" placeholder="re_123456789..." class="w-full bg-slate-900 border border-brand-border focus:border-emerald-500 text-slate-200 text-sm rounded-xl px-4 py-2.5 outline-none font-mono transition">
-                        <p class="text-[11px] text-slate-500 mt-1">If set, FilmsOverWeb uses Resend over HTTPS Port 443. (Bypasses Render's port block).</p>
+                        <p class="text-[11px] text-slate-500 mt-1">If set (and Option A is blank), FilmsOverWeb uses Resend over HTTPS Port 443.</p>
                     </div>
 
                     <div>
@@ -213,14 +244,14 @@
                 </div>
             </div>
 
-            <!-- Option B: Traditional Gmail SMTP (For Paid Render or Local Dev) -->
+            <!-- Option C: Traditional Gmail SMTP & Credentials -->
             <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-4 space-y-3">
                 <div class="flex items-center justify-between pb-2 border-b border-slate-800">
                     <div class="flex items-center space-x-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-800 px-2 py-0.5 rounded">Option B</span>
-                        <span class="text-xs font-bold text-slate-200">Google Mail SMTP (Direct Socket - Ports 465 / 587)</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-800 px-2 py-0.5 rounded">Option C</span>
+                        <span class="text-xs font-bold text-slate-200">Google Mail SMTP Credentials & Direct Socket</span>
                     </div>
-                    <span class="text-[11px] text-amber-400 font-medium">Requires Render Paid Tier or Local Dev</span>
+                    <span class="text-[11px] text-slate-400 font-medium">Used by Option A Worker & Direct SMTP</span>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

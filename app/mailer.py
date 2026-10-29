@@ -29,11 +29,13 @@ def get_smtp_config(db: Optional[Session] = None) -> dict:
         "user": settings.SMTP_USER,
         "password": settings.SMTP_PASSWORD,
         "use_ssl": settings.SMTP_USE_SSL,
+        "cloudflare_mail_worker_url": getattr(settings, "CLOUDFLARE_MAIL_WORKER_URL", ""),
+        "cloudflare_mail_worker_secret": getattr(settings, "CLOUDFLARE_MAIL_WORKER_SECRET", ""),
         "resend_api_key": getattr(settings, "RESEND_API_KEY", ""),
         "resend_from_email": getattr(settings, "RESEND_FROM_EMAIL", "")
     }
     if db:
-        for key in ["smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_use_ssl", "resend_api_key", "resend_from_email"]:
+        for key in ["smtp_host", "smtp_port", "smtp_user", "smtp_password", "smtp_use_ssl", "cloudflare_mail_worker_url", "cloudflare_mail_worker_secret", "resend_api_key", "resend_from_email"]:
             row = db.query(SystemSetting).filter(SystemSetting.key == key).first()
             if row and row.value is not None and row.value.strip():
                 if key == "smtp_port":
@@ -43,12 +45,68 @@ def get_smtp_config(db: Optional[Session] = None) -> dict:
                         pass
                 elif key == "smtp_use_ssl":
                     config["use_ssl"] = row.value.strip().lower() in ("true", "1", "yes")
-                elif key in ("resend_api_key", "resend_from_email"):
+                elif key in ("resend_api_key", "resend_from_email", "cloudflare_mail_worker_url", "cloudflare_mail_worker_secret"):
                     config[key] = row.value.strip()
                 else:
                     config[key.replace("smtp_", "")] = row.value.strip()
 
     return config
+
+def _dispatch_cloudflare_worker_email(
+    to_email: str,
+    subject: str,
+    text_content: str,
+    html_content: str,
+    cfg: dict
+) -> Tuple[bool, str]:
+    worker_url = (cfg.get("cloudflare_mail_worker_url") or "").strip().rstrip("/")
+    worker_secret = (cfg.get("cloudflare_mail_worker_secret") or "").strip()
+    smtp_user = (cfg.get("user") or "").strip()
+    smtp_password = (cfg.get("password") or "").strip().replace(" ", "")
+
+    if not smtp_user:
+        return False, "Gmail Sender Email is not configured in SuperAdmin Settings yet. Please configure it in Settings."
+    if not smtp_password:
+        return False, "Google App Password is not configured in SuperAdmin Settings yet. Please configure it in Settings."
+
+    try:
+        import httpx
+        payload = {
+            "smtp_user": smtp_user,
+            "smtp_pass": smtp_password,
+            "to": to_email,
+            "from_name": "FilmsOverWeb",
+            "subject": subject,
+            "html": html_content,
+            "text": text_content
+        }
+        if worker_secret:
+            payload["secret"] = worker_secret
+
+        resp = httpx.post(
+            worker_url,
+            json=payload,
+            timeout=20.0
+        )
+        if resp.status_code == 200:
+            try:
+                data = resp.json()
+            except Exception:
+                data = {}
+            if data.get("success", True):
+                return True, "Email sent successfully via Cloudflare Mail Worker (Port 443 HTTPS)."
+            return False, f"Cloudflare Mail Worker returned error: {data.get('error', 'Unknown error')}"
+        else:
+            err_text = resp.text
+            try:
+                data = resp.json()
+                if isinstance(data, dict):
+                    err_text = data.get("error") or data.get("message") or err_text
+            except Exception:
+                pass
+            return False, f"Cloudflare Mail Worker HTTP error ({resp.status_code}): {err_text}"
+    except Exception as e:
+        return False, f"Failed to connect to Cloudflare Mail Worker: {e}"
 
 def _dispatch_resend_email(
     to_email: str,
@@ -108,15 +166,16 @@ def send_guest_welcome_email(
     using Resend HTTPS API or Google Mail SMTP.
     """
     cfg = get_smtp_config(db)
+    cf_worker_url = (cfg.get("cloudflare_mail_worker_url") or "").strip()
     resend_key = (cfg.get("resend_api_key") or "").strip()
     sender = (cfg.get("user") or "").strip()
     password_smtp = (cfg.get("password") or "").strip().replace(" ", "")
 
-    if not resend_key:
+    if not cf_worker_url and not resend_key:
         if not sender and not password_smtp:
             return False, (
                 "Email automation is not configured yet. "
-                "On Render Free Tier, please provide a free Resend API Key in SuperAdmin Settings (port 443 HTTPS). "
+                "On Render Free Tier, please provide a Cloudflare Mail Worker URL or a free Resend API Key in SuperAdmin Settings (port 443 HTTPS). "
                 "Alternatively, if running locally or on a paid host, configure your Gmail address and Google App Password."
             )
         if not sender:
@@ -201,7 +260,15 @@ Note: You will be prompted to set your own permanent password upon first login.
 Enjoy movies streamed directly from Google Drive in full quality with HEVC and AV1 support.
     """
 
-    if resend_key:
+    if cf_worker_url:
+        return _dispatch_cloudflare_worker_email(
+            to_email=guest_email,
+            subject=subject,
+            text_content=text_content,
+            html_content=html_content,
+            cfg=cfg
+        )
+    elif resend_key:
         return _dispatch_resend_email(
             to_email=guest_email,
             subject=subject,
@@ -231,15 +298,16 @@ def send_password_reset_email(
     When they log in, they will be required to change it.
     """
     cfg = get_smtp_config(db)
+    cf_worker_url = (cfg.get("cloudflare_mail_worker_url") or "").strip()
     resend_key = (cfg.get("resend_api_key") or "").strip()
     sender = (cfg.get("user") or "").strip()
     password_smtp = (cfg.get("password") or "").strip().replace(" ", "")
 
-    if not resend_key:
+    if not cf_worker_url and not resend_key:
         if not sender and not password_smtp:
             return False, (
                 "Email automation is not configured yet. "
-                "On Render Free Tier, please provide a free Resend API Key in SuperAdmin Settings (port 443 HTTPS). "
+                "On Render Free Tier, please provide a Cloudflare Mail Worker URL or a free Resend API Key in SuperAdmin Settings (port 443 HTTPS). "
                 "Alternatively, if running locally or on a paid host, configure your Gmail address and Google App Password."
             )
         if not sender:
@@ -316,7 +384,15 @@ When you sign in with this temporary password, you will be prompted to choose yo
 If you did not request this, please contact your administrator.
     """
 
-    if resend_key:
+    if cf_worker_url:
+        return _dispatch_cloudflare_worker_email(
+            to_email=user_email,
+            subject=subject,
+            text_content=text_content,
+            html_content=html_content,
+            cfg=cfg
+        )
+    elif resend_key:
         return _dispatch_resend_email(
             to_email=user_email,
             subject=subject,
@@ -384,7 +460,7 @@ def _dispatch_smtp_email(to_email: str, msg: MIMEMultipart, cfg: dict, db: Optio
             return False, (
                 "[Errno 101] Network is unreachable. "
                 "Render Free Tier blocks outbound SMTP traffic on ports 25, 465, and 587. "
-                "To resolve this, enter a free Resend API Key in SuperAdmin Settings (which connects over HTTPS Port 443, never blocked), "
+                "To resolve this, enter your Cloudflare Mail Worker URL (or a free Resend API Key) in SuperAdmin Settings (which connects over HTTPS Port 443, never blocked), "
                 "or copy and share the credentials displayed on screen manually."
             )
         if "535" in err_msg or "BadCredentials" in err_msg or "Username and Password not accepted" in err_msg:
