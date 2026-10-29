@@ -161,6 +161,7 @@
         const episodeId = parseInt("{{ episode.id }}");
         const gdriveFileId = "{{ episode.gdrive_file_id }}";
         const googleApiKey = "{{ google_api_key or '' }}".trim();
+        const gdriveAccessToken = "{{ gdrive_access_token or '' }}".trim();
         const fileName = "{{ episode.file_name }}";
         const initialPosition = parseFloat("{{ initial_time }}") || 0;
         const totalDuration = parseFloat("{{ (episode.duration or 0) * 60 }}") || 0;
@@ -191,6 +192,9 @@
                 if (typeof moviPlayer.load === 'function') {
                     moviPlayer.load().catch(() => {});
                 }
+                if (typeof moviPlayer.play === 'function') {
+                    moviPlayer.play().catch(() => {});
+                }
             });
         }
 
@@ -198,8 +202,15 @@
         function buildStreamUrl(fileIdParam, fileNameParam) {
             if (cfWorkerUrl) {
                 let u = `${cfWorkerUrl}/?file_id=${encodeURIComponent(fileIdParam)}&name=${encodeURIComponent(fileNameParam)}`;
-                if (googleApiKey) u += `&key=${encodeURIComponent(googleApiKey)}`;
+                if (gdriveAccessToken) {
+                    u += `&token=${encodeURIComponent(gdriveAccessToken)}`;
+                } else if (googleApiKey) {
+                    u += `&key=${encodeURIComponent(googleApiKey)}`;
+                }
                 return u;
+            }
+            if (gdriveAccessToken) {
+                return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileIdParam)}?alt=media&access_token=${encodeURIComponent(gdriveAccessToken)}`;
             }
             if (googleApiKey) {
                 return `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileIdParam)}?alt=media&key=${encodeURIComponent(googleApiKey)}`;
@@ -213,24 +224,35 @@
 
         function handleStreamError(e) {
             console.warn("[Stream] movi-player stream error:", e);
-            if (cfWorkerUrl) {
-                showStreamError(
-                    "Playback Issue",
-                    "The episode stream could not be loaded via Cloudflare Worker. Please check your network connection or Cloudflare Worker configuration."
-                );
-            } else {
-                showStreamError(
-                    "Google Drive Quota Exceeded",
-                    "This episode has temporarily hit Google Drive's 24-hour public download quota. To enable high-bandwidth streaming without limits, configure a Cloudflare Worker Stream URL in SuperAdmin Settings."
-                );
+            if (moviPlayer.currentTime > 0) return;
+            const detail = (e && e.detail) ? e.detail : {};
+            const title = detail.title || "Playback Issue";
+            let msg = detail.message;
+            if (!msg) {
+                if (cfWorkerUrl) {
+                    msg = "The episode stream could not be loaded via Cloudflare Worker. Please check your network connection or Cloudflare Worker configuration.";
+                } else {
+                    msg = "This episode has temporarily hit Google Drive's 24-hour public download quota. To enable high-bandwidth streaming without limits, configure a Cloudflare Worker Stream URL in SuperAdmin Settings.";
+                }
             }
+            showStreamError(title, msg);
         }
 
         moviPlayer.addEventListener('error', handleStreamError);
         moviPlayer.addEventListener('mediaerror', handleStreamError);
         moviPlayer.addEventListener('errordisplay', (e) => {
             console.warn("[Stream] movi-player errordisplay:", e.detail);
+            if (e.detail && typeof e.detail === 'object') {
+                const titleLower = (e.detail.title || '').toLowerCase();
+                if (titleLower.includes('reconnect') || titleLower.includes('retrying') || titleLower.includes('buffer')) {
+                    return;
+                }
+            }
             handleStreamError(e);
+        });
+
+        moviPlayer.addEventListener('playing', () => {
+            if (errorBanner) errorBanner.classList.add('hidden');
         });
 
         moviPlayer.addEventListener('loadedmetadata', () => {

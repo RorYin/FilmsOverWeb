@@ -294,6 +294,9 @@ async def watch_player(
     google_api_key_row = db.query(SystemSetting).filter(SystemSetting.key == "google_api_key").first()
     google_api_key = google_api_key_row.value.strip() if google_api_key_row and google_api_key_row.value else settings.GOOGLE_API_KEY
 
+    from app.gdrive import get_gdrive_access_token
+    gdrive_access_token = get_gdrive_access_token(db)
+
     return templates.TemplateResponse(
         request=request,
         name="watch.html",
@@ -305,7 +308,8 @@ async def watch_player(
             "needs_transmux": needs_transmux,
             "quality_versions": quality_versions,
             "cloudflare_worker_url": cloudflare_worker_url,
-            "google_api_key": google_api_key
+            "google_api_key": google_api_key,
+            "gdrive_access_token": gdrive_access_token or ""
         }
     )
 

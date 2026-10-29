@@ -25,8 +25,9 @@ export default {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-          "Access-Control-Allow-Headers": "Range, Content-Type, Authorization, Accept-Encoding",
-          "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, Content-Type",
+          "Access-Control-Allow-Headers": "*",
+          "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges, Content-Type, Content-Disposition",
+          "Cross-Origin-Resource-Policy": "cross-origin",
           "Access-Control-Max-Age": "86400",
         },
       });
@@ -40,6 +41,7 @@ export default {
         status: 200,
         headers: {
           "Access-Control-Allow-Origin": "*",
+          "Cross-Origin-Resource-Policy": "cross-origin",
           "Content-Type": "text/plain",
         },
       });
@@ -62,15 +64,19 @@ export default {
           headers: {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
           },
         }
       );
     }
 
-    // 3. Build Google Drive direct download URL with bypass confirmation
+    // 3. Build Google Drive direct download URL with bypass confirmation or OAuth / API key
     const apiKey = url.searchParams.get("key") || "";
+    const token = url.searchParams.get("token") || request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") || "";
     let gdriveUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&confirm=t`;
-    if (apiKey) {
+    if (token) {
+      gdriveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+    } else if (apiKey) {
       gdriveUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${apiKey}`;
     }
 
@@ -92,6 +98,9 @@ export default {
           "Range": "bytes=0-0",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         });
+        if (token) {
+          probeHeaders.set("Authorization", `Bearer ${token}`);
+        }
         const probeResp = await fetch(gdriveUrl, {
           method: "GET",
           headers: probeHeaders,
@@ -111,6 +120,7 @@ export default {
               headers: {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
+                "Cross-Origin-Resource-Policy": "cross-origin",
                 "Retry-After": "3600"
               }
             }
@@ -126,8 +136,9 @@ export default {
         const headHeaders = new Headers();
         headHeaders.set("Access-Control-Allow-Origin", "*");
         headHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-        headHeaders.set("Access-Control-Allow-Headers", "Range, Content-Type, Authorization");
-        headHeaders.set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges, Content-Type");
+        headHeaders.set("Access-Control-Allow-Headers", "*");
+        headHeaders.set("Access-Control-Expose-Headers", "Content-Range, Content-Length, Accept-Ranges, Content-Type, Content-Disposition");
+        headHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
         headHeaders.set("Accept-Ranges", "bytes");
         headHeaders.set("Content-Type", defaultMime);
         if (totalSize && totalSize !== "*") {
@@ -144,6 +155,7 @@ export default {
           status: 200,
           headers: {
             "Access-Control-Allow-Origin": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
             "Accept-Ranges": "bytes",
             "Content-Type": defaultMime,
           }
@@ -163,6 +175,9 @@ export default {
       "User-Agent",
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
+    if (token) {
+      upstreamHeaders.set("Authorization", `Bearer ${token}`);
+    }
 
     try {
       const gdriveResponse = await fetch(gdriveUrl, {
@@ -189,21 +204,28 @@ export default {
             headers: {
               "Content-Type": "application/json",
               "Access-Control-Allow-Origin": "*",
+              "Cross-Origin-Resource-Policy": "cross-origin",
               "Retry-After": "3600"
             },
           }
         );
       }
 
-      // 6. Clone and inject CORS + Range + Cache headers
+      // 6. Clone and inject CORS + Range + Cache headers (strip restrictive Google headers)
       const responseHeaders = new Headers(gdriveResponse.headers);
       responseHeaders.set("Access-Control-Allow-Origin", "*");
       responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-      responseHeaders.set("Access-Control-Allow-Headers", "Range, Content-Type, Authorization");
+      responseHeaders.set("Access-Control-Allow-Headers", "*");
       responseHeaders.set(
         "Access-Control-Expose-Headers",
-        "Content-Range, Content-Length, Accept-Ranges, Content-Type"
+        "Content-Range, Content-Length, Accept-Ranges, Content-Type, Content-Disposition"
       );
+      responseHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
+      responseHeaders.delete("Content-Security-Policy");
+      responseHeaders.delete("X-Content-Security-Policy");
+      responseHeaders.delete("Cross-Origin-Opener-Policy");
+      responseHeaders.delete("Cross-Origin-Embedder-Policy");
+      responseHeaders.set("Content-Disposition", "inline");
       responseHeaders.set("Accept-Ranges", "bytes");
       responseHeaders.set("Cache-Control", "public, max-age=86400");
 
@@ -228,6 +250,7 @@ export default {
           headers: {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
+            "Cross-Origin-Resource-Policy": "cross-origin",
           },
         }
       );

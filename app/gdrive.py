@@ -97,6 +97,38 @@ def get_access_token(sa_info: dict) -> Optional[str]:
         print(f"[GDRIVE] Failed to obtain access token from service account: {e}")
         return None
 
+_cached_sa_token: Optional[str] = None
+_cached_sa_expiry: float = 0.0
+
+def get_gdrive_access_token(db: Optional[Session] = None) -> Optional[str]:
+    """Generate or return cached bearer token from service account info."""
+    global _cached_sa_token, _cached_sa_expiry
+    import time
+    if _cached_sa_token and time.time() < (_cached_sa_expiry - 300):
+        return _cached_sa_token
+
+    _, sa_info = get_google_credentials_info(db)
+    if not sa_info:
+        return None
+
+    try:
+        from google.oauth2 import service_account
+        from google.auth.transport.requests import Request
+        creds = service_account.Credentials.from_service_account_info(
+            sa_info,
+            scopes=["https://www.googleapis.com/auth/drive.readonly"]
+        )
+        creds.refresh(Request())
+        _cached_sa_token = creds.token
+        if creds.expiry:
+            _cached_sa_expiry = creds.expiry.timestamp()
+        else:
+            _cached_sa_expiry = time.time() + 3500
+        return _cached_sa_token
+    except Exception as e:
+        print(f"[GDRIVE] Failed to obtain cached access token from service account: {e}")
+        return None
+
 async def scrape_public_drive_folder(root_folder_id: str, max_depth: int = 3) -> List[Dict[str, Any]]:
     """
     Extracts video files directly from a public Google Drive folder page and its subfolders
