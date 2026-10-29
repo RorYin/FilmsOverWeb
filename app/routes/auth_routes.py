@@ -99,7 +99,7 @@ async def login_page(request: Request, next: str = "/", auto: Optional[str] = No
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"next": next, "error": None}
+        context={"next": next, "email": "", "error": None}
     )
 
 @router.post("/login")
@@ -115,7 +115,7 @@ async def login_action(
         return templates.TemplateResponse(
             request=request,
             name="login.html",
-            context={"next": next, "error": "Invalid email address or password."},
+            context={"next": next, "email": email, "error": "Invalid email address or password."},
             status_code=400
         )
     
@@ -123,7 +123,7 @@ async def login_action(
         return templates.TemplateResponse(
             request=request,
             name="login.html",
-            context={"next": next, "error": "Your account has been deactivated."},
+            context={"next": next, "email": email, "error": "Your account has been deactivated."},
             status_code=403
         )
 

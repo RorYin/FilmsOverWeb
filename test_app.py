@@ -549,8 +549,14 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertEqual(guest_user.role, "guest")
         db.close()
 
-        # Login as guest@filmsoverweb.com
+        # Verify GET /login does not prefill default credentials in the form
         client = TestClient(app)
+        login_get = client.get("/login")
+        self.assertEqual(login_get.status_code, 200)
+        self.assertNotIn(b'value="guest@filmsoverweb.com"', login_get.content)
+        self.assertNotIn(b'value="guest@123"', login_get.content)
+
+        # Login as guest@filmsoverweb.com
         login_resp = client.post("/login", data={
             "email": "guest@filmsoverweb.com",
             "password": "guest@123",
@@ -618,23 +624,21 @@ class TestFilmsOverWeb(unittest.TestCase):
         # Login as guest to access watch page
         client.post("/login", data={"email": "guest@filmsoverweb.com", "password": "guest@123", "next": "/"})
         
-        # Test movie watch page contains engine switcher, movi-player with sw="false", and native player
+        # Test movie watch page contains pure WASM movi-player with sw="auto" and no engine switcher dropdown
         watch_resp = client.get(f"/watch/{movie_id}")
         self.assertEqual(watch_resp.status_code, 200)
-        self.assertIn(b'id="engine-btn"', watch_resp.content)
-        self.assertIn(b'sw="false"', watch_resp.content)
-        self.assertIn(b'fallback="native"', watch_resp.content)
-        self.assertIn(b'id="native-player"', watch_resp.content)
-        self.assertIn(b'switchPlayerEngine', watch_resp.content)
+        self.assertIn(b'movi-player', watch_resp.content)
+        self.assertIn(b'sw="auto"', watch_resp.content)
+        self.assertNotIn(b'id="engine-btn"', watch_resp.content)
+        self.assertNotIn(b'id="native-player"', watch_resp.content)
 
-        # Test episode watch page contains engine switcher, movi-player with sw="false", and native player
+        # Test episode watch page contains pure WASM movi-player with sw="auto" and no engine switcher dropdown
         watch_ep_resp = client.get(f"/watch/episode/{episode_id}")
         self.assertEqual(watch_ep_resp.status_code, 200)
-        self.assertIn(b'id="engine-btn"', watch_ep_resp.content)
-        self.assertIn(b'sw="false"', watch_ep_resp.content)
-        self.assertIn(b'fallback="native"', watch_ep_resp.content)
-        self.assertIn(b'id="native-player"', watch_ep_resp.content)
-        self.assertIn(b'switchPlayerEngine', watch_ep_resp.content)
+        self.assertIn(b'movi-player', watch_ep_resp.content)
+        self.assertIn(b'sw="auto"', watch_ep_resp.content)
+        self.assertNotIn(b'id="engine-btn"', watch_ep_resp.content)
+        self.assertNotIn(b'id="native-player"', watch_ep_resp.content)
 
         # Test movie M3U playlist endpoint
         m3u_resp = client.get(f"/stream/playlist/{movie_id}.m3u")

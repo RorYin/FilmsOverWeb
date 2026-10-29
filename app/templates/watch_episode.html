@@ -35,68 +35,8 @@
                 </div>
             </div>
 
-            <!-- Right: Engine Switcher, Episode Dropdown & Next Episode Button -->
+            <!-- Right: Episode Switcher Dropdown & Next Episode Button -->
             <div class="flex items-center space-x-2 sm:space-x-3">
-                <!-- Playback Engine / Hardware Mode Switcher -->
-                <div class="relative" id="engine-selector-wrapper">
-                    <button id="engine-btn" type="button" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow-sm cursor-pointer" title="Playback Engine & 10-bit HEVC Hardware Acceleration">
-                        <i data-lucide="cpu" class="w-4 h-4 text-amber-400"></i>
-                        <span id="current-engine-label">WebCodecs GPU</span>
-                        <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
-                    </button>
-
-                    <!-- Engine Dropdown -->
-                    <div id="engine-dropdown" class="hidden absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl py-2 z-50 backdrop-blur-xl">
-                        <div class="px-3.5 py-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800 mb-1 flex items-center justify-between">
-                            <span>Decoder & Playback Engine</span>
-                            <span class="text-amber-400 text-[10px]">10-bit HEVC</span>
-                        </div>
-                        
-                        <button type="button" onclick="switchPlayerEngine('webcodecs')" class="engine-opt-btn w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer text-brand-red font-bold bg-brand-red/10" data-engine="webcodecs">
-                            <div>
-                                <div class="font-bold flex items-center space-x-1.5">
-                                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
-                                    <span>WebCodecs GPU (Default)</span>
-                                </div>
-                                <p class="text-[10px] text-slate-400 mt-0.5">Hardware WebCodecs (Pure GPU decoding)</p>
-                            </div>
-                            <span class="engine-check"><i data-lucide="check" class="w-4 h-4 text-brand-red"></i></span>
-                        </button>
-
-                        <button type="button" onclick="switchPlayerEngine('native')" class="engine-opt-btn w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer text-slate-200" data-engine="native">
-                            <div>
-                                <div class="font-bold flex items-center space-x-1.5">
-                                    <i data-lucide="tv" class="w-3.5 h-3.5 text-brand-blue"></i>
-                                    <span>Native Hardware (Recommended for TV)</span>
-                                </div>
-                                <p class="text-[10px] text-slate-400 mt-0.5">TV / Browser Native Media Chip (Zero CPU)</p>
-                            </div>
-                            <span class="engine-check hidden"><i data-lucide="check" class="w-4 h-4 text-brand-red"></i></span>
-                        </button>
-
-                        <button type="button" onclick="switchPlayerEngine('transmux')" class="engine-opt-btn w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between hover:bg-slate-800 transition cursor-pointer text-slate-200" data-engine="transmux">
-                            <div>
-                                <div class="font-bold flex items-center space-x-1.5">
-                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-emerald-400"></i>
-                                    <span>Server Remux (Lossless MP4)</span>
-                                </div>
-                                <p class="text-[10px] text-slate-400 mt-0.5">Lossless copy (-c:v copy) into MP4 container</p>
-                            </div>
-                            <span class="engine-check hidden"><i data-lucide="check" class="w-4 h-4 text-brand-red"></i></span>
-                        </button>
-
-                        <div class="border-t border-slate-800 my-1"></div>
-                        
-                        <a href="/stream/playlist/episode/{{ episode.id }}.m3u" class="w-full text-left px-3.5 py-2 text-xs flex items-center justify-between hover:bg-slate-800 transition text-amber-400 font-semibold" title="Open in VLC, MPV or PotPlayer with full native hardware acceleration">
-                            <div class="flex items-center space-x-1.5">
-                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                                <span>Open in VLC / External Player</span>
-                            </div>
-                            <span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded">.m3u</span>
-                        </a>
-                    </div>
-                </div>
-
                 <!-- Quick Episode Switcher Dropdown -->
                 {% if season_episodes and season_episodes|length > 1 %}
                 <div class="relative" id="ep-selector-wrapper">
@@ -145,28 +85,30 @@
             </div>
         </div>
 
-        <!-- Video Player Container (WebCodecs GPU + Native Hardware Fallback) -->
+        <!-- Video Player Container (Always WASM + WebCodecs decoding) -->
         <div id="player-container" class="relative z-10 bg-black rounded-2xl overflow-hidden border border-brand-border/80 shadow-2xl aspect-video">
-            <!-- WebCodecs Hardware-Accelerated Player (sw="false" prevents CPU software fallback lag) -->
             <movi-player id="movi-player"
                          src=""
                          controls
                          playsinline
                          doubletap
-                         sw="false"
-                         fallback="native"
-                         hdr
-                         fastseek
+                         sw="auto"
                          class="w-full h-full block">
             </movi-player>
 
-            <!-- Native HTML5 Direct Hardware Player (Ideal for LG webOS TV & High Bitrate 10-bit HEVC) -->
-            <video id="native-player"
-                   controls
-                   playsinline
-                   preload="auto"
-                   class="w-full h-full hidden bg-black">
-            </video>
+            <!-- Next Episode Prompt Overlay (Shown in final 25 seconds) -->
+            {% if next_episode %}
+            <div id="next-ep-banner" class="hidden absolute top-4 right-4 z-30 bg-slate-900/90 border border-brand-border p-4 rounded-2xl backdrop-blur-md shadow-2xl flex items-center space-x-4 max-w-sm">
+                <div>
+                    <p class="text-[10px] uppercase font-bold text-slate-400">Up Next</p>
+                    <p class="text-xs font-bold text-white truncate max-w-[180px]">E{{ next_episode.episode_number }}: {{ next_episode.title or ('Episode ' ~ next_episode.episode_number) }}</p>
+                </div>
+                <a href="/watch/episode/{{ next_episode.id }}" class="px-3.5 py-2 bg-brand-red hover:bg-brand-redHover text-black text-xs font-extrabold rounded-xl transition flex-none flex items-center space-x-1">
+                    <span>Play Now</span>
+                    <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
+                </a>
+            </div>
+            {% endif %}
 
             <!-- Stream Error & Fallback Banner -->
             <div id="stream-error-banner" class="hidden absolute inset-0 z-40 bg-slate-950/90 backdrop-blur flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -175,34 +117,17 @@
                 </div>
                 <div class="space-y-1.5 max-w-md">
                     <h3 class="text-base font-bold text-white" id="stream-error-title">Stream Loading Issue</h3>
-                    <p class="text-xs text-slate-300" id="stream-error-msg">The episode took too long to load or your device is struggling with 10-bit HEVC.</p>
+                    <p class="text-xs text-slate-300" id="stream-error-msg">The video took too long to load or Google Drive's download quota was reached.</p>
                 </div>
                 <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
-                    <button onclick="switchPlayerEngine('native')" type="button" class="px-4 py-2 bg-brand-blue hover:bg-blue-600 text-white text-xs font-bold rounded-xl transition cursor-pointer">
-                        Use Native TV Hardware Engine
+                    <button id="btn-force-server" type="button" class="px-4 py-2 bg-brand-red hover:bg-brand-redHover text-black text-xs font-bold rounded-xl transition cursor-pointer">
+                        Stream via Backend Server
                     </button>
-                    <button onclick="switchPlayerEngine('transmux')" type="button" class="px-4 py-2 bg-brand-red hover:bg-brand-redHover text-black text-xs font-bold rounded-xl transition cursor-pointer">
-                        Use Server Remux Mode
-                    </button>
-                    <a href="/series" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
-                        Back to Shows
+                    <a href="/series/{{ series.id }}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
+                        Back to Series
                     </a>
                 </div>
             </div>
-
-            <!-- Auto-Next Episode Overlay Banner (shown in last 20 seconds of episode) -->
-            {% if next_episode %}
-            <div id="next-ep-banner" class="hidden absolute bottom-20 right-6 z-30 bg-slate-900/95 border border-slate-700 p-4 rounded-2xl shadow-2xl backdrop-blur max-w-sm flex items-center space-x-3.5 animate-bounce-short">
-                <div class="flex-1">
-                    <span class="text-[10px] uppercase font-extrabold tracking-wider text-amber-400 block">Up Next in 10s</span>
-                    <span class="text-xs font-bold text-white truncate block">S{{ "%02d"|format(next_episode.season_number) }}E{{ "%02d"|format(next_episode.episode_number) }}: {{ next_episode.title or ('Episode ' ~ next_episode.episode_number) }}</span>
-                </div>
-                <a href="/watch/episode/{{ next_episode.id }}" class="bg-brand-red hover:bg-brand-redHover text-black font-black text-xs px-3 py-2 rounded-xl flex items-center space-x-1 transition flex-none">
-                    <span>Play</span>
-                    <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
-                </a>
-            </div>
-            {% endif %}
         </div>
 
         <!-- Clean Subtle Shortcuts Guide -->
@@ -225,31 +150,42 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const cfWorkerUrl = "{{ cloudflare_worker_url or '' }}".trim().replace(/\/+$/, '');
+        const episodeId = parseInt("{{ episode.id }}");
         const gdriveFileId = "{{ episode.gdrive_file_id }}";
         const googleApiKey = "{{ google_api_key or '' }}".trim();
         const fileName = "{{ episode.file_name }}";
         const userToken = "{{ user_token }}";
-        const episodeId = parseInt("{{ episode.id }}");
         const initialPosition = parseFloat("{{ initial_time }}") || 0;
         const totalDuration = parseFloat("{{ (episode.duration or 0) * 60 }}") || 0;
-        const nextEpisodeUrl = "{% if next_episode %}/watch/episode/{{ next_episode.id }}{% endif %}";
+        const nextEpisodeUrl = "{{ ('/watch/episode/' ~ next_episode.id) if next_episode else '' }}";
 
         const playerContainer = document.getElementById('player-container');
         const moviPlayer = document.getElementById('movi-player');
-        const nativePlayer = document.getElementById('native-player');
         const nextEpBanner = document.getElementById('next-ep-banner');
-        const engineLabel = document.getElementById('current-engine-label');
-        const engineDropdown = document.getElementById('engine-dropdown');
-        const engineBtn = document.getElementById('engine-btn');
+        const errorBanner = document.getElementById('stream-error-banner');
+        const errorTitle = document.getElementById('stream-error-title');
+        const errorMsg = document.getElementById('stream-error-msg');
+        const btnForceServer = document.getElementById('btn-force-server');
 
-        // Detect if running on an LG webOS Smart TV
-        const isWebOSTV = /Web0S|webOS/i.test(navigator.userAgent);
-        
-        // Default engine: Native for webOS TV (uses TV hardware chip), WebCodecs GPU for desktop
-        let currentEngine = localStorage.getItem('fow_player_engine') || (isWebOSTV ? 'native' : 'webcodecs');
+        function showStreamError(title, msg) {
+            if (errorBanner) {
+                if (title && errorTitle) errorTitle.innerText = title;
+                if (msg && errorMsg) errorMsg.innerText = msg;
+                errorBanner.classList.remove('hidden');
+                if (window.lucide) window.lucide.createIcons();
+            }
+        }
 
-        function getActivePlayer() {
-            return currentEngine === 'webcodecs' ? moviPlayer : nativePlayer;
+        if (btnForceServer) {
+            btnForceServer.addEventListener('click', () => {
+                if (errorBanner) errorBanner.classList.add('hidden');
+                fallbackAttempted = true;
+                const serverUrl = buildStreamUrl(episodeId, gdriveFileId, fileName, true);
+                moviPlayer.setAttribute('src', serverUrl);
+                if (typeof moviPlayer.load === 'function') {
+                    moviPlayer.load().catch(() => {});
+                }
+            });
         }
 
         function buildStreamUrl(epIdParam, fileIdParam, fileNameParam, forceDirect = false) {
@@ -261,158 +197,62 @@
             return `/stream/episode/raw/${epIdParam}?token=${encodeURIComponent(userToken)}`;
         }
 
-        // Engine Switching Engine
-        window.switchPlayerEngine = function(engine, isInitial = false) {
-            const active = getActivePlayer();
-            const currentTime = isInitial ? initialPosition : (active ? (active.currentTime || 0) : initialPosition);
-            const wasPlaying = isInitial ? false : (active ? !active.paused : true);
+        // Initialize WASM Player
+        const initialWasmUrl = buildStreamUrl(episodeId, gdriveFileId, fileName);
+        moviPlayer.setAttribute('src', initialWasmUrl);
 
-            // Pause both players
-            try { moviPlayer.pause(); } catch(e){}
-            try { nativePlayer.pause(); } catch(e){}
-
-            currentEngine = engine;
-            localStorage.setItem('fow_player_engine', engine);
-
-            // Update Dropdown checkmarks & active styling
-            document.querySelectorAll('.engine-opt-btn').forEach(btn => {
-                const bEng = btn.getAttribute('data-engine');
-                const check = btn.querySelector('.engine-check');
-                if (bEng === engine) {
-                    btn.classList.add('text-brand-red', 'font-bold', 'bg-brand-red/10');
-                    btn.classList.remove('text-slate-200');
-                    if (check) check.classList.remove('hidden');
-                } else {
-                    btn.classList.remove('text-brand-red', 'font-bold', 'bg-brand-red/10');
-                    btn.classList.add('text-slate-200');
-                    if (check) check.classList.add('hidden');
-                }
-            });
-
-            if (engineDropdown) engineDropdown.classList.add('hidden');
-
-            if (engine === 'webcodecs') {
-                if (engineLabel) engineLabel.textContent = "WebCodecs GPU";
-                nativePlayer.classList.add('hidden');
-                moviPlayer.classList.remove('hidden');
-                nativePlayer.removeAttribute('src');
-
-                const streamUrl = buildStreamUrl(episodeId, gdriveFileId, fileName);
-                moviPlayer.setAttribute('src', streamUrl);
-                moviPlayer.addEventListener('loadedmetadata', () => {
-                    if (currentTime > 0) moviPlayer.currentTime = currentTime;
-                    if (wasPlaying) moviPlayer.play().catch(() => {});
-                }, { once: true });
-                if (typeof moviPlayer.load === 'function') moviPlayer.load().catch(() => {});
-            } else if (engine === 'native') {
-                if (engineLabel) engineLabel.textContent = "Native Hardware";
-                moviPlayer.classList.add('hidden');
-                nativePlayer.classList.remove('hidden');
-                moviPlayer.removeAttribute('src');
-
-                // Native direct stream
-                const streamUrl = buildStreamUrl(episodeId, gdriveFileId, fileName, false);
-                nativePlayer.src = streamUrl;
-                nativePlayer.addEventListener('loadedmetadata', () => {
-                    if (currentTime > 0) nativePlayer.currentTime = currentTime;
-                    if (wasPlaying) nativePlayer.play().catch(() => {});
-                }, { once: true });
-                nativePlayer.load();
-            } else if (engine === 'transmux') {
-                if (engineLabel) engineLabel.textContent = "Server Remux";
-                moviPlayer.classList.add('hidden');
-                nativePlayer.classList.remove('hidden');
-                moviPlayer.removeAttribute('src');
-
-                // Transmuxed stream with playhead offset
-                const seekParam = Math.floor(currentTime);
-                const transmuxUrl = `/stream/transmux/episode/${episodeId}?token=${encodeURIComponent(userToken)}&ss=${seekParam}`;
-                nativePlayer.src = transmuxUrl;
-                nativePlayer.addEventListener('loadedmetadata', () => {
-                    if (wasPlaying) nativePlayer.play().catch(() => {});
-                }, { once: true });
-                nativePlayer.load();
-            }
-        };
-
-        // Engine dropdown toggle
-        if (engineBtn && engineDropdown) {
-            engineBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                engineDropdown.classList.toggle('hidden');
-                const epDropdown = document.getElementById('ep-dropdown');
-                if (epDropdown) epDropdown.classList.add('hidden');
-            });
-            document.addEventListener('click', () => {
-                engineDropdown.classList.add('hidden');
-            });
-        }
-
-        // Initialize active player engine
-        switchPlayerEngine(currentEngine, true);
-
-        // Error & Fallback handling
-        const errorBanner = document.getElementById('stream-error-banner');
-        function showStreamError(title, msg) {
-            if (errorBanner) {
-                const errorTitle = document.getElementById('stream-error-title');
-                const errorMsg = document.getElementById('stream-error-msg');
-                if (title && errorTitle) errorTitle.innerText = title;
-                if (msg && errorMsg) errorMsg.innerText = msg;
-                errorBanner.classList.remove('hidden');
-                if (window.lucide) window.lucide.createIcons();
-            }
-        }
-
+        // Auto-fallback from Cloudflare Worker to local server stream if worker network fails
         let fallbackAttempted = false;
-        function tryFallbackStream() {
-            if (currentEngine === 'webcodecs' && !fallbackAttempted) {
+        function tryFallbackStream(e) {
+            if (cfWorkerUrl && !fallbackAttempted) {
                 fallbackAttempted = true;
-                console.warn("[Stream] WebCodecs encountered stutter or decode refusal. Auto-switching to Native Hardware Engine...");
-                switchPlayerEngine('native');
+                console.warn("[Stream] Cloudflare Worker stream error or quota limit. Switching to backend server stream...");
+                const serverUrl = buildStreamUrl(episodeId, gdriveFileId, fileName, true);
+                moviPlayer.setAttribute('src', serverUrl);
+                if (typeof moviPlayer.load === 'function') {
+                    moviPlayer.load().catch(() => {});
+                }
             } else {
                 showStreamError(
-                    "Video Playback Notice",
-                    "If 10-bit HEVC is stuttering on your device, switch engine to 'Native Hardware' or 'Server Remux' above."
+                    "Google Drive Quota Exceeded",
+                    "This episode has temporarily hit Google Drive's 24-hour public download quota. To enable high-bandwidth streaming without limits, add a Google Service Account in SuperAdmin Settings."
                 );
             }
         }
 
         moviPlayer.addEventListener('error', tryFallbackStream);
         moviPlayer.addEventListener('mediaerror', tryFallbackStream);
-        nativePlayer.addEventListener('error', () => {
-            if (currentEngine === 'native') {
-                console.warn("[Stream] Native player error. Falling back to Server Remux Mode...");
-                switchPlayerEngine('transmux');
-            }
+        moviPlayer.addEventListener('errordisplay', (e) => {
+            console.warn("[Stream] movi-player errordisplay:", e.detail);
+            tryFallbackStream(e);
         });
 
-        // Watchdog: If player is stalled without metadata for 10 seconds, try fallback
+        // If player is stalled/empty for more than 10 seconds without metadata, trigger fallback
         const loadWatchdog = setTimeout(() => {
-            const active = getActivePlayer();
-            if (active && !active.duration && !active.currentTime && !fallbackAttempted) {
-                console.warn("[Stream] Initial metadata took too long. Auto-switching engine...");
+            if (!moviPlayer.duration && !moviPlayer.currentTime && !fallbackAttempted && cfWorkerUrl) {
+                console.warn("[Stream] Player took too long to load initial metadata. Triggering server stream fallback...");
                 tryFallbackStream();
             }
-        }, 12000);
+        }, 10000);
 
         moviPlayer.addEventListener('loadedmetadata', () => {
             clearTimeout(loadWatchdog);
             if (errorBanner) errorBanner.classList.add('hidden');
         }, { once: true });
 
-        nativePlayer.addEventListener('loadedmetadata', () => {
-            clearTimeout(loadWatchdog);
-            if (errorBanner) errorBanner.classList.add('hidden');
-        }, { once: true });
+        if (initialPosition > 5) {
+            moviPlayer.addEventListener('loadedmetadata', () => {
+                moviPlayer.currentTime = initialPosition;
+            }, { once: true });
+        }
 
-        // Progress reporting (every 8 seconds and on pause) for both engines
+        // Progress reporting (every 8 seconds and on pause)
         let lastReportTime = 0;
         let nextBannerShown = false;
 
-        function reportProgress(player) {
-            const cur = player.currentTime || 0;
-            const dur = totalDuration > 0 ? totalDuration : (player.duration || 0);
+        moviPlayer.addEventListener('timeupdate', () => {
+            const cur = moviPlayer.currentTime || 0;
+            const dur = totalDuration > 0 ? totalDuration : (moviPlayer.duration || 0);
 
             if (Math.abs(cur - lastReportTime) >= 8) {
                 lastReportTime = cur;
@@ -428,10 +268,7 @@
                 nextBannerShown = true;
                 if (nextEpBanner) nextEpBanner.classList.remove('hidden');
             }
-        }
-
-        moviPlayer.addEventListener('timeupdate', () => reportProgress(moviPlayer));
-        nativePlayer.addEventListener('timeupdate', () => reportProgress(nativePlayer));
+        });
 
         moviPlayer.addEventListener('pause', () => {
             const cur = moviPlayer.currentTime || 0;
@@ -443,31 +280,18 @@
             }).catch(e => {});
         });
 
-        nativePlayer.addEventListener('pause', () => {
-            const cur = nativePlayer.currentTime || 0;
-            const dur = totalDuration > 0 ? totalDuration : (nativePlayer.duration || 0);
+        // Auto transition on video end
+        moviPlayer.addEventListener('ended', () => {
             fetch(`/api/episodes/${episodeId}/progress`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ position: cur, duration: dur })
-            }).catch(e => {});
-        });
-
-        // Auto transition on video end for both players
-        function handleEnded(player) {
-            fetch(`/api/episodes/${episodeId}/progress`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ position: player.duration || 0, duration: player.duration || 0 })
+                body: JSON.stringify({ position: moviPlayer.duration || 0, duration: moviPlayer.duration || 0 })
             }).catch(e => {});
 
             if (nextEpisodeUrl) {
                 window.location.href = nextEpisodeUrl;
             }
-        }
-
-        moviPlayer.addEventListener('ended', () => handleEnded(moviPlayer));
-        nativePlayer.addEventListener('ended', () => handleEnded(nativePlayer));
+        });
 
         // Dropdown toggle for episodes quick switcher
         const epDropdownBtn = document.getElementById('ep-dropdown-btn');
@@ -476,47 +300,43 @@
             epDropdownBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 epDropdown.classList.toggle('hidden');
-                if (engineDropdown) engineDropdown.classList.add('hidden');
             });
             document.addEventListener('click', () => {
                 epDropdown.classList.add('hidden');
             });
         }
 
-        // Global Keyboard & Remote Shortcuts
+        // Global Keyboard Shortcuts
         window.addEventListener('keydown', (e) => {
             if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
 
-            const player = getActivePlayer();
-            if (!player) return;
-
             if (e.code === 'Space') {
                 e.preventDefault();
-                if (player.paused) {
-                    player.play().catch(err => {});
+                if (moviPlayer.paused) {
+                    moviPlayer.play().catch(err => {});
                 } else {
-                    player.pause();
+                    moviPlayer.pause();
                 }
             } else if (e.key === 'ArrowLeft') {
                 e.preventDefault();
-                player.currentTime = Math.max(0, (player.currentTime || 0) - 10);
+                moviPlayer.currentTime = Math.max(0, (moviPlayer.currentTime || 0) - 10);
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
-                const dur = totalDuration > 0 ? totalDuration : (player.duration || 999999);
-                player.currentTime = Math.min(dur, (player.currentTime || 0) + 10);
+                const dur = totalDuration > 0 ? totalDuration : (moviPlayer.duration || 999999);
+                moviPlayer.currentTime = Math.min(dur, (moviPlayer.currentTime || 0) + 10);
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                player.volume = Math.min(1.0, (player.volume ?? 1.0) + 0.1);
+                moviPlayer.volume = Math.min(1.0, (moviPlayer.volume ?? 1.0) + 0.1);
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                player.volume = Math.max(0.0, (player.volume ?? 1.0) - 0.1);
+                moviPlayer.volume = Math.max(0.0, (moviPlayer.volume ?? 1.0) - 0.1);
             } else if (e.key === 'f' || e.key === 'F') {
                 e.preventDefault();
                 if (!document.fullscreenElement) {
                     if (playerContainer.requestFullscreen) {
                         playerContainer.requestFullscreen();
-                    } else if (player.requestFullscreen) {
-                        player.requestFullscreen();
+                    } else if (moviPlayer.requestFullscreen) {
+                        moviPlayer.requestFullscreen();
                     }
                 } else {
                     if (document.exitFullscreen) {
@@ -525,7 +345,7 @@
                 }
             } else if (e.key === 'm' || e.key === 'M') {
                 e.preventDefault();
-                player.muted = !player.muted;
+                moviPlayer.muted = !moviPlayer.muted;
             } else if ((e.key === 'n' || e.key === 'N') && nextEpisodeUrl) {
                 e.preventDefault();
                 window.location.href = nextEpisodeUrl;

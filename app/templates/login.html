@@ -45,7 +45,7 @@
             <div>
                 <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
                 <div class="relative">
-                    <input type="email" name="email" value="guest@filmsoverweb.com" required placeholder="your.email@example.com" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
+                    <input type="email" name="email" value="{{ email or '' }}" required placeholder="your.email@example.com" autocomplete="email" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
                     <i data-lucide="mail" class="w-4 h-4 text-slate-500 absolute left-3.5 top-3"></i>
                 </div>
             </div>
@@ -56,7 +56,7 @@
                     <a href="/forgot-password" class="text-xs text-amber-400 hover:text-amber-300 hover:underline transition">Forgot password?</a>
                 </div>
                 <div class="relative">
-                    <input type="password" name="password" value="guest@123" required placeholder="••••••••••••" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
+                    <input type="password" name="password" value="" required placeholder="••••••••••••" autocomplete="current-password" class="w-full bg-slate-900/90 border border-brand-border focus:border-brand-red text-slate-200 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition">
                     <i data-lucide="lock" class="w-4 h-4 text-slate-500 absolute left-3.5 top-3"></i>
                 </div>
             </div>
