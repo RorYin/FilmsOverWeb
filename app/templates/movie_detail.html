@@ -365,7 +365,7 @@
                     <span class="text-[10px] text-amber-400 uppercase tracking-wider font-extrabold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">Auto-Unlocks with Embedded PIN</span>
                 </label>
                 <div class="flex items-center space-x-2">
-                    <input type="text" id="share-link-input" readonly class="flex-1 bg-black/60 border border-brand-border rounded-xl px-3.5 py-2.5 text-xs font-mono text-amber-300 focus:outline-none select-all shadow-inner">
+                    <input type="text" id="share-link-input" readonly class="flex-1 share-link-input bg-slate-900 border border-brand-border rounded-xl px-3.5 py-2.5 text-xs font-mono text-amber-300 focus:outline-none select-all shadow-inner" style="background-color: #12161f !important; border-color: #272f3d !important; color: #fbbf24 !important;">
                     <button type="button" onclick="copyShareLink()" class="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 transition cursor-pointer flex-none shadow-md shadow-amber-500/20">
                         <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                         <span>Copy Link</span>
@@ -374,7 +374,7 @@
             </div>
 
             <!-- PIN Code Display Box -->
-            <div class="bg-black/40 border border-brand-border rounded-xl p-3.5 flex items-center justify-between">
+            <div class="bg-slate-900 border border-brand-border rounded-xl p-3.5 flex items-center justify-between" style="background-color: #12161f !important; border-color: #272f3d !important;">
                 <div>
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Embedded 4-Digit PIN Code</span>
                     <div id="share-pin-display" class="text-2xl font-black font-mono text-white tracking-[0.25em]">----</div>
@@ -433,10 +433,10 @@
 
         <!-- 4-Digit Inputs -->
         <div class="flex justify-center gap-3 my-4">
-            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-0" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-black/60 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition">
-            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-1" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-black/60 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition">
-            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-2" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-black/60 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition">
-            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-3" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-black/60 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-0" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-slate-900 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition" style="background-color: #12161f !important; border-color: #272f3d !important; color: #fbbf24 !important;">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-1" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-slate-900 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition" style="background-color: #12161f !important; border-color: #272f3d !important; color: #fbbf24 !important;">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-2" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-slate-900 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition" style="background-color: #12161f !important; border-color: #272f3d !important; color: #fbbf24 !important;">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]*" id="pin-digit-3" class="pin-digit-box w-12 h-16 text-center text-3xl font-black font-mono bg-slate-900 border-2 border-brand-border rounded-xl text-amber-300 focus:border-amber-400 focus:outline-none transition" style="background-color: #12161f !important; border-color: #272f3d !important; color: #fbbf24 !important;">
         </div>
 
         <button type="button" id="pin-submit-btn" onclick="submitPin()" class="w-full bg-brand-red hover:bg-brand-redHover text-black py-3 px-4 rounded-xl font-black text-sm shadow-xl shadow-brand-red/30 transition transform hover:scale-[1.02] cursor-pointer flex items-center justify-center space-x-2">

@@ -285,3 +285,20 @@ nav button.tv-focused i {
     transform: scale(0.96) !important;
     transition: transform 0.1s ease !important;
 }
+
+/* Share link inputs and PIN input boxes - Dark Theme */
+#share-link-input,
+.share-link-input,
+.pin-digit-box {
+    background-color: #12161f !important;
+    border-color: #272f3d !important;
+    color: #fbbf24 !important;
+}
+
+#share-link-input:focus,
+.share-link-input:focus,
+.pin-digit-box:focus {
+    background-color: #161b26 !important;
+    border-color: #fbbf24 !important;
+}
+
