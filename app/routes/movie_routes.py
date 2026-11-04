@@ -347,7 +347,9 @@ async def generate_movie_share(
     user: User = Depends(require_role(["superadmin"]))
 ):
     """
-    SuperAdmin generates a 48h shareable link with a 4-digit PIN for this movie.
+    SuperAdmin generates a single-use shareable link with embedded PIN for this movie.
+    The link stays active until hit by a recipient, which automatically unlocks 48-hour access on their browser,
+    and immediately deletes the PIN backend-wide.
     """
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
@@ -359,7 +361,6 @@ async def generate_movie_share(
     pin_code = f"{secrets.randbelow(10000):04d}"
     # Cryptographically secure URL-safe share token
     share_token = secrets.token_urlsafe(20)
-    expires_at = utc_now() + timedelta(hours=48)
 
     share_record = MovieSharePin(
         share_token=share_token,
@@ -367,20 +368,21 @@ async def generate_movie_share(
         pin_code=pin_code,
         created_by_id=user.id,
         created_at=utc_now(),
-        expires_at=expires_at
+        expires_at=None
     )
     db.add(share_record)
     db.commit()
 
     base_url = str(request.base_url).rstrip("/")
-    share_url = f"{base_url}/share/{share_token}"
+    relative_url = f"/share/{share_token}?pin={pin_code}"
+    share_url = f"{base_url}{relative_url}"
 
     return JSONResponse({
         "success": True,
         "share_token": share_token,
         "share_url": share_url,
+        "relative_url": relative_url,
         "pin_code": pin_code,
-        "expires_in_hours": 48,
         "movie_title": movie.title,
         "movie_year": movie.year
     })
@@ -389,12 +391,16 @@ async def generate_movie_share(
 async def view_shared_movie(
     token: str,
     request: Request,
+    pin: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
     Public entry point for a shared movie link.
-    Only allows seeing this movie's details.
-    Playback requires entering the 4-digit PIN (or active 48h browser cookie).
+    If the URL includes the 4-digit PIN (?pin=...), on first hit it:
+    1. Unlocks lossless streaming on this browser for 48 hours (sets cookies).
+    2. Immediately expires and deletes the PIN/link from the backend database.
+    If already unlocked on this browser, renders with an active 48-hour pass.
+    If not in DB and no active cookie, shows share_expired.html.
     """
     cleanup_expired_share_pins(db)
 
@@ -449,7 +455,7 @@ async def view_shared_movie(
     # If not yet unlocked on this browser, look up the share in the DB
     share = db.query(MovieSharePin).filter(MovieSharePin.share_token == token).first()
 
-    # If not found in DB and no cookie, the link either expired or was already used on another browser
+    # If not found in DB and no cookie, the link either was already used on another browser or manually deleted
     if not share:
         return templates.TemplateResponse(
             request=request,
@@ -472,6 +478,58 @@ async def view_shared_movie(
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
+    # If the URL contains the PIN and matches, immediately auto-unlock and consume/delete the PIN!
+    if pin and str(pin).strip() == str(share.pin_code).strip():
+        movie_id = share.movie_id
+        # Consume and delete immediately from backend DB upon first hit
+        db.delete(share)
+        db.commit()
+
+        # Create 48-hour access token for this browser
+        share_payload = {
+            "sub": f"shared_viewer_{token[:10]}",
+            "role": "guest",
+            "is_shared": True,
+            "shared_movie_id": movie_id,
+            "share_token": token
+        }
+        access_token = create_access_token(share_payload, expires_delta=timedelta(hours=48))
+        max_age_48h = 48 * 3600
+
+        shared_user = User(
+            id=0,
+            name="Shared Guest",
+            email=f"shared_viewer_{token[:10]}",
+            role="guest",
+            is_active=True,
+            must_change_password=False
+        )
+        setattr(shared_user, "is_shared", True)
+        setattr(shared_user, "shared_movie_id", movie.id)
+        setattr(shared_user, "share_token", token)
+
+        quality_versions = get_quality_versions(movie, db)
+
+        resp = templates.TemplateResponse(
+            request=request,
+            name="movie_detail.html",
+            context={
+                "user": shared_user,
+                "movie": movie,
+                "progress": None,
+                "quality_versions": quality_versions,
+                "related_movies": [],
+                "is_share_page": True,
+                "is_unlocked": True,
+                "share_token": token
+            }
+        )
+        resp.set_cookie(key=f"fow_share_{token}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
+        resp.set_cookie(key=f"fow_share_movie_{movie_id}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
+        resp.set_cookie(key="fow_share_token", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
+        return resp
+
+    # If PIN was not in URL or incorrect, render locked details page where user can enter PIN manually
     shared_user = User(
         id=0,
         name="Shared Guest",
@@ -500,6 +558,15 @@ async def view_shared_movie(
             "share_token": token
         }
     )
+
+@router.get("/share/{token}/{pin}", response_class=HTMLResponse)
+async def view_shared_movie_path(
+    token: str,
+    pin: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    return await view_shared_movie(token=token, request=request, pin=pin, db=db)
 
 @router.post("/api/share/{token}/verify")
 async def verify_share_pin(

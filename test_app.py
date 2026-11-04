@@ -896,6 +896,10 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertIsNotNone(movie, "At least one movie must exist in DB for share testing")
         movie_id = movie.id
         movie_title = movie.title
+        admin = db.query(User).filter(User.role == "superadmin").first()
+        if admin:
+            admin.must_change_password = False
+            db.commit()
         db.close()
 
         # 1. Unauthenticated or non-superadmin cannot generate share links
@@ -1014,24 +1018,66 @@ class TestFilmsOverWeb(unittest.TestCase):
             other_watch = viewer_client.get(f"/watch/{other_movie.id}", follow_redirects=False)
             self.assertIn(other_watch.status_code, [307, 403])
 
-        # 11. Test that an expired PIN link (older than 48 hours) is cleaned up and rejected
-        admin_resp2 = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
-        token2 = admin_resp2.json().get("share_token")
-        
-        # Manually backdate expires_at
-        db = SessionLocal()
-        share2 = db.query(MovieSharePin).filter(MovieSharePin.share_token == token2).first()
-        share2.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
-        db.commit()
-        db.close()
+        # 11. Test 1-Click Embedded PIN Link and Active Share Links Page:
+        # Generate another share link with embedded PIN
+        gen_resp2 = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        data2 = gen_resp2.json()
+        token2 = data2.get("share_token")
+        pin2 = data2.get("pin_code")
+        share_url2 = data2.get("share_url")
+        self.assertIn(f"?pin={pin2}", share_url2)
 
-        # Accessing expired share link renders share_expired.html and deletes from DB
-        expired_page = anon_client.get(f"/share/{token2}")
-        self.assertIn(expired_page.status_code, [404, 410])
-        self.assertIn(b"Share Link Expired", expired_page.content)
+        # 12. SuperAdmin checks active share links on /superadmin/share-links
+        # Non-superadmin cannot access
+        non_admin_resp = guest_client.get("/superadmin/share-links", follow_redirects=False)
+        self.assertEqual(non_admin_resp.status_code, 403)
 
+        # SuperAdmin visits /superadmin/share-links
+        admin_links_page = admin_client.get("/superadmin/share-links")
+        self.assertEqual(admin_links_page.status_code, 200)
+        self.assertIn(movie_title.encode("utf-8"), admin_links_page.content)
+        self.assertIn(pin2.encode("utf-8"), admin_links_page.content)
+        self.assertIn(token2.encode("utf-8"), admin_links_page.content)
+
+        # 13. Direct 1-Click Hit by Recipient: opens /share/{token2}?pin={pin2}
+        direct_viewer = TestClient(app)
+        direct_hit = direct_viewer.get(f"/share/{token2}?pin={pin2}")
+        self.assertEqual(direct_hit.status_code, 200)
+        self.assertIn(b"Unlocked", direct_hit.content)
+        self.assertIn(b"PIN Verified", direct_hit.content)
+
+        # Verify 48h cookies were set on this direct-hit browser
+        direct_cookies = direct_hit.headers.get("set-cookie", "")
+        self.assertIn(f"fow_share_{token2}", direct_cookies)
+        self.assertIn(f"fow_share_movie_{movie_id}", direct_cookies)
+
+        # Verify PIN was immediately DELETED from DB on first hit
         db = SessionLocal()
         self.assertIsNone(db.query(MovieSharePin).filter(MovieSharePin.share_token == token2).first())
+        db.close()
+
+        # Second device attempting to open the same 1-click URL gets expired error
+        other_user_resp = anon_client.get(f"/share/{token2}?pin={pin2}")
+        self.assertEqual(other_user_resp.status_code, 404)
+        self.assertIn(b"Share Link Expired", other_user_resp.content)
+
+        # 14. SuperAdmin Manual Deletion of an Active Unused Link
+        gen_resp3 = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        token3 = gen_resp3.json().get("share_token")
+        db = SessionLocal()
+        pin3_obj = db.query(MovieSharePin).filter(MovieSharePin.share_token == token3).first()
+        self.assertIsNotNone(pin3_obj)
+        link3_id = pin3_obj.id
+        db.close()
+
+        # SuperAdmin deletes link manually
+        del_link_resp = admin_client.post(f"/superadmin/share-links/{link3_id}/delete", follow_redirects=False)
+        self.assertEqual(del_link_resp.status_code, 302)
+        self.assertIn("/superadmin/share-links?deleted=1", del_link_resp.headers.get("location", ""))
+
+        # Verify link is deleted from DB
+        db = SessionLocal()
+        self.assertIsNone(db.query(MovieSharePin).filter(MovieSharePin.id == link3_id).first())
         db.close()
 
 if __name__ == "__main__":

@@ -358,43 +358,52 @@
 
         <!-- Result State -->
         <div id="share-modal-result" class="hidden space-y-5">
-            <!-- PIN Code Display Box -->
-            <div class="bg-black/50 border border-amber-500/40 rounded-xl p-4 text-center">
-                <span class="text-[11px] font-bold text-amber-400 uppercase tracking-widest block mb-1">Single-Use 4-Digit PIN Code</span>
-                <div id="share-pin-display" class="text-4xl font-black font-mono text-amber-300 tracking-[0.35em] my-1">----</div>
-                <span class="text-[10px] text-slate-400 block mt-1">Once verified on a browser, this PIN immediately deletes from the database.</span>
-            </div>
-
-            <!-- Share URL Box -->
+            <!-- Share URL Box (Primary 1-Click Link with Embedded PIN) -->
             <div class="space-y-1.5">
-                <label class="text-xs font-bold text-slate-300 block">Shareable Link</label>
+                <label class="text-xs font-bold text-slate-200 flex items-center justify-between">
+                    <span>1-Click Direct Share Link</span>
+                    <span class="text-[10px] text-amber-400 uppercase tracking-wider font-extrabold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">Auto-Unlocks with Embedded PIN</span>
+                </label>
                 <div class="flex items-center space-x-2">
-                    <input type="text" id="share-link-input" readonly class="flex-1 bg-black/40 border border-brand-border rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none select-all">
-                    <button type="button" onclick="copyShareLink()" class="bg-brand-surface hover:bg-slate-700 border border-brand-border text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold flex items-center space-x-1 transition cursor-pointer">
+                    <input type="text" id="share-link-input" readonly class="flex-1 bg-black/60 border border-brand-border rounded-xl px-3.5 py-2.5 text-xs font-mono text-amber-300 focus:outline-none select-all shadow-inner">
+                    <button type="button" onclick="copyShareLink()" class="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 transition cursor-pointer flex-none shadow-md shadow-amber-500/20">
                         <i data-lucide="copy" class="w-3.5 h-3.5"></i>
-                        <span>Copy</span>
+                        <span>Copy Link</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Rules notice -->
-            <div class="bg-brand-surface/60 border border-brand-border rounded-xl p-3 text-[11px] text-slate-400 space-y-1">
-                <div class="flex items-center space-x-1.5 text-slate-300 font-semibold">
-                    <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i>
-                    <span>Validity: 48 Hours</span>
+            <!-- PIN Code Display Box -->
+            <div class="bg-black/40 border border-brand-border rounded-xl p-3.5 flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Embedded 4-Digit PIN Code</span>
+                    <div id="share-pin-display" class="text-2xl font-black font-mono text-white tracking-[0.25em]">----</div>
                 </div>
-                <p>The recipient can view movie details freely. Upon entering the 4-digit PIN, playback unlocks for 48 hours on that browser only, and the PIN is permanently erased from the server.</p>
-            </div>
-
-            <!-- Copy Action Buttons -->
-            <div class="grid grid-cols-2 gap-2 pt-1">
-                <button type="button" onclick="copySharePin()" class="bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center space-x-1.5 border border-slate-700 transition cursor-pointer">
-                    <i data-lucide="key" class="w-3.5 h-3.5 text-amber-400"></i>
+                <button type="button" onclick="copySharePin()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs py-2 px-3 rounded-xl flex items-center space-x-1 border border-slate-700 transition cursor-pointer">
+                    <i data-lucide="key" class="w-3 h-3 text-amber-400"></i>
                     <span>Copy PIN Only</span>
                 </button>
-                <button type="button" onclick="copyShareAll()" class="bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center space-x-1.5 shadow-md shadow-amber-500/20 transition cursor-pointer">
-                    <i data-lucide="clipboard-check" class="w-3.5 h-3.5"></i>
-                    <span>Copy Link + PIN</span>
+            </div>
+
+            <!-- Rules notice -->
+            <div class="bg-brand-surface/60 border border-brand-border rounded-xl p-3.5 text-[11px] text-slate-400 space-y-1.5">
+                <div class="flex items-center space-x-1.5 text-slate-200 font-semibold">
+                    <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span>Automatic First-Click Activation</span>
+                </div>
+                <p class="leading-relaxed">
+                    When the recipient opens this link, playback automatically unlocks for 48 hours on that browser. As soon as it is opened, the link expires and is removed from the backend database so no one else can use it.
+                </p>
+            </div>
+
+            <!-- Bottom Action & Active Links Shortcut -->
+            <div class="pt-2 flex items-center justify-between border-t border-brand-border/60 text-xs">
+                <a href="/superadmin/share-links" class="text-amber-400 hover:text-amber-300 font-bold inline-flex items-center space-x-1 transition">
+                    <i data-lucide="list" class="w-3.5 h-3.5"></i>
+                    <span>Manage all active share links &rarr;</span>
+                </a>
+                <button type="button" onclick="closeSuperAdminShareModal()" class="text-slate-400 hover:text-white py-1 px-3 rounded-lg transition">
+                    Done
                 </button>
             </div>
         </div>
@@ -490,7 +499,9 @@
                 throw new Error(data.detail || 'Failed to generate share PIN');
             }
 
-            const fullShareUrl = window.location.origin + data.share_url;
+            const fullShareUrl = data.share_url.startsWith('http')
+                ? data.share_url
+                : window.location.origin + data.share_url;
             document.getElementById('share-pin-display').innerText = data.pin_code;
             document.getElementById('share-link-input').value = fullShareUrl;
 
@@ -521,7 +532,7 @@
     function copyShareLink() {
         if (!currentShareData) return;
         navigator.clipboard.writeText(currentShareData.url);
-        showToast('Share link copied to clipboard!');
+        showToast('Direct share link copied to clipboard!');
     }
 
     function copySharePin() {
@@ -532,9 +543,9 @@
 
     function copyShareAll() {
         if (!currentShareData) return;
-        const msg = `Watch "${currentShareData.movieTitle}" on FilmsOverWeb:\nLink: ${currentShareData.url}\nPIN: ${currentShareData.pin}\n(Valid for 48 hours. Single-device PIN.)`;
+        const msg = `Watch "${currentShareData.movieTitle}" on FilmsOverWeb:\n${currentShareData.url}`;
         navigator.clipboard.writeText(msg);
-        showToast('Link & PIN copied to clipboard!');
+        showToast('Link copied to clipboard!');
     }
     {% endif %}
 

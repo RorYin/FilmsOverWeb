@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import secrets
 from app.database import get_db, desc, Session
-from app.models import User, SystemSetting, TvLoginCode
+from app.models import User, SystemSetting, TvLoginCode, MovieSharePin, Movie
 from app.config import settings
 from app.auth import get_current_user, require_role, get_password_hash
 from app.mailer import send_guest_welcome_email, get_smtp_config
@@ -295,4 +295,61 @@ async def delete_tv_code_action(
         db.delete(code_to_del)
         db.commit()
     return RedirectResponse(url="/superadmin/tv-codes?deleted=1", status_code=status.HTTP_302_FOUND)
+
+
+# --- Active Movie Share Links Management (Only SuperAdmin) ---
+
+@router.get("/share-links", response_class=HTMLResponse)
+async def list_share_links(
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(superadmin_only)
+):
+    """
+    List all active unused movie share links.
+    SuperAdmin can view the 1-click shareable URL with embedded PIN and manually delete links if not used for many days.
+    """
+    links = db.query(MovieSharePin).order_by(desc(MovieSharePin.created_at)).all()
+    deleted = request.query_params.get("deleted") == "1"
+
+    base_url = str(request.base_url).rstrip("/")
+    enhanced_links = []
+    for l in links:
+        m = l.movie
+        c = l.created_by
+        full_url = f"{base_url}/share/{l.share_token}?pin={l.pin_code}"
+        enhanced_links.append({
+            "id": l.id,
+            "token": l.share_token,
+            "pin": l.pin_code,
+            "url": full_url,
+            "movie": m,
+            "created_by": c,
+            "created_at": l.created_at
+        })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="superadmin/share_links.html",
+        context={
+            "user": user,
+            "links": enhanced_links,
+            "active_count": len(enhanced_links),
+            "deleted": deleted
+        }
+    )
+
+@router.post("/share-links/{link_id}/delete")
+async def delete_share_link_action(
+    link_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(superadmin_only)
+):
+    """Manually delete an active unused share link."""
+    link_to_del = db.query(MovieSharePin).filter(MovieSharePin.id == link_id).first()
+    if link_to_del:
+        db.delete(link_to_del)
+        db.commit()
+    return RedirectResponse(url="/superadmin/share-links?deleted=1", status_code=status.HTTP_302_FOUND)
+
 
