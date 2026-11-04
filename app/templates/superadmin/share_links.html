@@ -65,9 +65,15 @@
                             {% if l.movie %}
                             {{ l.movie.title }}
                             {% else %}
-                            <span class="text-slate-400 italic">Unknown Movie</span>
+                            <span class="text-rose-400">{{ l.movie_title or 'Deleted Movie' }}</span>
+                            <span class="inline-block ml-1 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] font-semibold">Deleted from Drive</span>
                             {% endif %}
                         </h4>
+                        {% if l.file_name %}
+                        <div class="text-[10px] font-mono text-slate-400 truncate max-w-[260px] mt-0.5" title="{{ l.file_name }}">
+                            {{ l.file_name }}
+                        </div>
+                        {% endif %}
                         <div class="flex items-center space-x-2 text-[11px] text-slate-400 mt-1">
                             {% if l.movie and l.movie.year %}
                             <span class="bg-slate-800 px-1.5 py-0.5 rounded text-slate-300 font-semibold">{{ l.movie.year }}</span>

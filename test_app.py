@@ -1080,6 +1080,110 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertIsNone(db.query(MovieSharePin).filter(MovieSharePin.id == link3_id).first())
         db.close()
 
+        # 15. Resilience against Render redeployment ID reassignment:
+        # Superadmin generates a share link that embeds the file name in the URL
+        gen_resp4 = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        self.assertEqual(gen_resp4.status_code, 200)
+        data4 = gen_resp4.json()
+        token4 = data4.get("share_token")
+        pin4 = data4.get("pin_code")
+        share_url4 = data4.get("share_url")
+        self.assertIn(f"?pin={pin4}", share_url4)
+        self.assertIn("&file=", share_url4)
+
+        # Recipient unlocks access prior to redeployment (receives cookie with pre-redeploy ID)
+        redeploy_client = TestClient(app)
+        redeploy_hit = redeploy_client.get(share_url4)
+        self.assertEqual(redeploy_hit.status_code, 200)
+        self.assertIn(b"Unlocked", redeploy_hit.content)
+
+        # Simulate Render redeploying: The database re-indexes Google Drive files in a different order.
+        # Movie ID shifts from movie_id to 9999.
+        db = SessionLocal()
+        m_reindex = db.query(Movie).filter(Movie.id == movie_id).first()
+        old_id = m_reindex.id
+        m_reindex.id = 9999
+        db.commit()
+        db.close()
+
+        try:
+            # Check that accessing old bookmarked watch URL /watch/{old_id} redirects to the new re-indexed ID /watch/9999
+            redir_watch = redeploy_client.get(f"/watch/{old_id}", follow_redirects=False)
+            self.assertEqual(redir_watch.status_code, 302)
+            self.assertIn("/watch/9999", redir_watch.headers.get("location", ""))
+
+            # Client can access player for the new re-indexed movie ID 9999
+            player_page = redeploy_client.get("/watch/9999")
+            self.assertEqual(player_page.status_code, 200)
+            self.assertIn(b"movi-player", player_page.content)
+
+            # Client is still strictly forbidden from accessing any other movie ID (e.g. 1234)
+            unauth_watch = redeploy_client.get("/watch/1234", follow_redirects=False)
+            self.assertIn(unauth_watch.status_code, [307, 403, 404])
+
+            # Also test: A link was generated BEFORE redeployment (stored movie_id=old_id),
+            # but redeemed by a recipient AFTER redeployment (movie is now id=9999).
+            gen_resp4_post = admin_client.post(f"/api/superadmin/movies/9999/share")
+            data4_post = gen_resp4_post.json()
+            db = SessionLocal()
+            pin_post = db.query(MovieSharePin).filter(MovieSharePin.share_token == data4_post["share_token"]).first()
+            pin_post.movie_id = old_id
+            db.commit()
+            db.close()
+
+            post_redeploy_client = TestClient(app)
+            post_resp = post_redeploy_client.get(data4_post["share_url"])
+            self.assertEqual(post_resp.status_code, 200)
+            self.assertIn(b"Unlocked", post_resp.content)
+            post_player = post_redeploy_client.get("/watch/9999")
+            self.assertEqual(post_player.status_code, 200)
+            self.assertIn(b"movi-player", post_player.content)
+        finally:
+            # Restore movie id in DB
+            db = SessionLocal()
+            m_restore = db.query(Movie).filter(Movie.id == 9999).first()
+            if m_restore:
+                m_restore.id = old_id
+                db.commit()
+            db.close()
+
+        # 16. Source Movie Deleted from Google Drive:
+        # Create a share link for a movie that is subsequently deleted from Drive
+        gen_resp5 = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        token5 = gen_resp5.json().get("share_token")
+        pin5 = gen_resp5.json().get("pin_code")
+
+        # Simulate movie deleted from Google Drive by temporarily setting MovieSharePin gdrive_file_id & file_name to non-existent
+        db = SessionLocal()
+        pin5_obj = db.query(MovieSharePin).filter(MovieSharePin.share_token == token5).first()
+        pin5_obj.gdrive_file_id = "non_existent_gdrive_id_999999"
+        pin5_obj.file_name = "DeletedMovie.2024.1080p.mkv"
+        pin5_obj.movie_id = 999999
+        db.commit()
+        db.close()
+
+        # In superadmin/share-links, it should show 'Deleted from Drive' badge
+        admin_links_deleted = admin_client.get("/superadmin/share-links")
+        self.assertEqual(admin_links_deleted.status_code, 200)
+        self.assertIn(b"Deleted from Drive", admin_links_deleted.content)
+        self.assertIn(b"DeletedMovie.2024.1080p.mkv", admin_links_deleted.content)
+
+        # A recipient trying to open GET /share/{token5} sees cinema-themed "Source Movie Not Found" error
+        missing_viewer = TestClient(app)
+        missing_resp = missing_viewer.get(f"/share/{token5}")
+        self.assertEqual(missing_resp.status_code, 404)
+        self.assertIn(b"Source Movie Not Found", missing_resp.content)
+        self.assertIn(b"deleted or removed from Google Drive", missing_resp.content)
+        self.assertIn(b"DeletedMovie.2024.1080p.mkv", missing_resp.content)
+
+        # Clean up pin5 from DB
+        db = SessionLocal()
+        p5 = db.query(MovieSharePin).filter(MovieSharePin.share_token == token5).first()
+        if p5:
+            db.delete(p5)
+            db.commit()
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

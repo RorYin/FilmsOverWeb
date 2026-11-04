@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
 from datetime import datetime, timezone, timedelta
@@ -225,7 +225,61 @@ async def movie_detail(
 ):
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
+        if getattr(user, "is_shared", False):
+            shared_gid = getattr(user, "shared_gdrive_file_id", None)
+            shared_fname = getattr(user, "shared_file_name", None)
+            real_movie = None
+            if shared_gid:
+                real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+            if not real_movie and shared_fname:
+                real_movie = db.query(Movie).filter(Movie.file_name == shared_fname).first()
+
+            if real_movie:
+                return RedirectResponse(url=f"/movie/{real_movie.id}", status_code=302)
+
+            return templates.TemplateResponse(
+                request=request,
+                name="share_source_missing.html",
+                context={
+                    "request": request,
+                    "movie_title": getattr(user, "movie_title", ""),
+                    "file_name": getattr(user, "shared_file_name", "")
+                },
+                status_code=404
+            )
         raise HTTPException(status_code=404, detail="Movie not found")
+
+    if getattr(user, "is_shared", False):
+        shared_gid = getattr(user, "shared_gdrive_file_id", None)
+        shared_fname = getattr(user, "shared_file_name", None)
+        matches = False
+        if movie.id == getattr(user, "shared_movie_id", None):
+            matches = True
+        elif shared_gid and movie.gdrive_file_id == shared_gid:
+            matches = True
+        elif shared_fname and movie.file_name == shared_fname:
+            matches = True
+
+        if not matches:
+            real_movie = None
+            if shared_gid:
+                real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+            if not real_movie and shared_fname:
+                real_movie = db.query(Movie).filter(Movie.file_name == shared_fname).first()
+
+            if real_movie:
+                return RedirectResponse(url=f"/movie/{real_movie.id}", status_code=302)
+            else:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="share_source_missing.html",
+                    context={
+                        "request": request,
+                        "movie_title": getattr(user, "movie_title", ""),
+                        "file_name": shared_fname or ""
+                    },
+                    status_code=404
+                )
 
     # Check user watch progress
     progress = db.query(WatchProgress).filter(
@@ -267,7 +321,64 @@ async def watch_player(
 ):
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
+        # If user is shared, check if their movie was re-indexed under another ID after redeployment
+        if getattr(user, "is_shared", False):
+            shared_gid = getattr(user, "shared_gdrive_file_id", None)
+            shared_fname = getattr(user, "shared_file_name", None)
+            real_movie = None
+            if shared_gid:
+                real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+            if not real_movie and shared_fname:
+                real_movie = db.query(Movie).filter(Movie.file_name == shared_fname).first()
+
+            if real_movie:
+                return RedirectResponse(url=f"/watch/{real_movie.id}", status_code=302)
+
+            return templates.TemplateResponse(
+                request=request,
+                name="share_source_missing.html",
+                context={
+                    "request": request,
+                    "movie_title": getattr(user, "movie_title", ""),
+                    "file_name": getattr(user, "shared_file_name", "")
+                },
+                status_code=404
+            )
         raise HTTPException(status_code=404, detail="Movie not found")
+
+    # If user is shared, ensure this movie actually matches their shared file
+    if getattr(user, "is_shared", False):
+        shared_gid = getattr(user, "shared_gdrive_file_id", None)
+        shared_fname = getattr(user, "shared_file_name", None)
+        matches = False
+        if movie.id == getattr(user, "shared_movie_id", None):
+            matches = True
+        elif shared_gid and movie.gdrive_file_id == shared_gid:
+            matches = True
+        elif shared_fname and movie.file_name == shared_fname:
+            matches = True
+
+        if not matches:
+            # Check if the real movie is indexed under a different ID after redeploy
+            real_movie = None
+            if shared_gid:
+                real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+            if not real_movie and shared_fname:
+                real_movie = db.query(Movie).filter(Movie.file_name == shared_fname).first()
+
+            if real_movie:
+                return RedirectResponse(url=f"/watch/{real_movie.id}", status_code=302)
+            else:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="share_source_missing.html",
+                    context={
+                        "request": request,
+                        "movie_title": getattr(user, "movie_title", ""),
+                        "file_name": shared_fname or ""
+                    },
+                    status_code=404
+                )
 
     progress = db.query(WatchProgress).filter(
         WatchProgress.user_id == user.id,
@@ -282,6 +393,9 @@ async def watch_player(
     if getattr(user, "is_shared", False):
         token_data["is_shared"] = True
         token_data["shared_movie_id"] = movie.id
+        token_data["shared_gdrive_file_id"] = movie.gdrive_file_id
+        token_data["shared_file_name"] = movie.file_name
+        token_data["movie_title"] = movie.title
         token_data["share_token"] = getattr(user, "share_token", "")
     user_token = create_access_token(
         token_data,
@@ -339,6 +453,37 @@ def cleanup_expired_share_pins(db: Session):
     if changed:
         db.commit()
 
+def resolve_shared_movie(share: MovieSharePin, db: Session, fallback_file_name: Optional[str] = None) -> Optional[Movie]:
+    """
+    Finds the active Movie object in the database using immutable Google Drive identifiers.
+    Guarantees that even if autoincrement database IDs are re-assigned upon Render redeployments,
+    the shared link will NEVER play the wrong movie, and will detect if the file was deleted from Google Drive.
+    """
+    # 1. Primary lookup: Unique immutable Google Drive file ID
+    if getattr(share, "gdrive_file_id", None):
+        movie = db.query(Movie).filter(Movie.gdrive_file_id == share.gdrive_file_id).first()
+        if movie:
+            return movie
+
+    # 2. Secondary lookup: Exact file_name from Google Drive
+    fname = getattr(share, "file_name", None) or fallback_file_name
+    if fname:
+        movie = db.query(Movie).filter(Movie.file_name == fname).first()
+        if movie:
+            return movie
+
+    # 3. Tertiary fallback: movie_id, but only if its file_name or gdrive_file_id matches or share has neither
+    if share.movie_id:
+        cand = db.query(Movie).filter(Movie.id == share.movie_id).first()
+        if cand:
+            if getattr(share, "gdrive_file_id", None) and cand.gdrive_file_id != share.gdrive_file_id:
+                return None
+            if fname and cand.file_name != fname:
+                return None
+            return cand
+
+    return None
+
 @router.post("/api/superadmin/movies/{movie_id}/share")
 async def generate_movie_share(
     movie_id: int,
@@ -347,13 +492,67 @@ async def generate_movie_share(
     user: User = Depends(require_role(["superadmin"]))
 ):
     """
-    SuperAdmin generates a single-use shareable link with embedded PIN for this movie.
+    SuperAdmin generates a single-use shareable link with embedded PIN and filename for this movie.
     The link stays active until hit by a recipient, which automatically unlocks 48-hour access on their browser,
     and immediately deletes the PIN backend-wide.
     """
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
+        if getattr(user, "is_shared", False):
+            shared_gid = getattr(user, "shared_gdrive_file_id", None)
+            shared_fname = getattr(user, "shared_file_name", None)
+            real_movie = None
+            if shared_gid:
+                real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+            if not real_movie and shared_fname:
+                real_movie = db.query(Movie).filter(Movie.file_name == shared_fname).first()
+
+            if real_movie:
+                return RedirectResponse(url=f"/movie/{real_movie.id}", status_code=302)
+
+            return templates.TemplateResponse(
+                request=request,
+                name="share_source_missing.html",
+                context={
+                    "request": request,
+                    "movie_title": getattr(user, "movie_title", ""),
+                    "file_name": getattr(user, "shared_file_name", "")
+                },
+                status_code=404
+            )
         raise HTTPException(status_code=404, detail="Movie not found")
+
+    if getattr(user, "is_shared", False):
+        shared_gid = getattr(user, "shared_gdrive_file_id", None)
+        shared_fname = getattr(user, "shared_file_name", None)
+        matches = False
+        if movie.id == getattr(user, "shared_movie_id", None):
+            matches = True
+        elif shared_gid and movie.gdrive_file_id == shared_gid:
+            matches = True
+        elif shared_fname and movie.file_name == shared_fname:
+            matches = True
+
+        if not matches:
+            real_movie = None
+            if shared_gid:
+                real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+            if not real_movie and shared_fname:
+                real_movie = db.query(Movie).filter(Movie.file_name == shared_fname).first()
+
+            if real_movie:
+                return RedirectResponse(url=f"/movie/{real_movie.id}", status_code=302)
+            else:
+                return templates.TemplateResponse(
+                    request=request,
+                    name="share_source_missing.html",
+                    context={
+                        "request": request,
+                        "movie_title": getattr(user, "movie_title", ""),
+                        "file_name": shared_fname or ""
+                    },
+                    status_code=404
+                )
 
     cleanup_expired_share_pins(db)
 
@@ -365,6 +564,9 @@ async def generate_movie_share(
     share_record = MovieSharePin(
         share_token=share_token,
         movie_id=movie.id,
+        gdrive_file_id=movie.gdrive_file_id,
+        file_name=movie.file_name,
+        movie_title=movie.title,
         pin_code=pin_code,
         created_by_id=user.id,
         created_at=utc_now(),
@@ -373,8 +575,10 @@ async def generate_movie_share(
     db.add(share_record)
     db.commit()
 
+    from urllib.parse import quote
+    encoded_file = quote(movie.file_name)
     base_url = str(request.base_url).rstrip("/")
-    relative_url = f"/share/{share_token}?pin={pin_code}"
+    relative_url = f"/share/{share_token}?pin={pin_code}&file={encoded_file}"
     share_url = f"{base_url}{relative_url}"
 
     return JSONResponse({
@@ -384,7 +588,8 @@ async def generate_movie_share(
         "relative_url": relative_url,
         "pin_code": pin_code,
         "movie_title": movie.title,
-        "movie_year": movie.year
+        "movie_year": movie.year,
+        "file_name": movie.file_name
     })
 
 @router.get("/share/{token}", response_class=HTMLResponse)
@@ -392,6 +597,7 @@ async def view_shared_movie(
     token: str,
     request: Request,
     pin: Optional[str] = Query(None),
+    file: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
@@ -400,6 +606,7 @@ async def view_shared_movie(
     1. Unlocks lossless streaming on this browser for 48 hours (sets cookies).
     2. Immediately expires and deletes the PIN/link from the backend database.
     If already unlocked on this browser, renders with an active 48-hour pass.
+    If the source file was deleted from Google Drive, shows share_source_missing.html.
     If not in DB and no active cookie, shows share_expired.html.
     """
     cleanup_expired_share_pins(db)
@@ -413,15 +620,36 @@ async def view_shared_movie(
     unlocked_payload = None
     if cookie_token:
         payload = decode_access_token(cookie_token)
-        if payload and payload.get("is_shared") and (payload.get("share_token") == token or payload.get("shared_movie_id")):
+        if payload and payload.get("is_shared") and (payload.get("share_token") == token or payload.get("shared_movie_id") or payload.get("shared_gdrive_file_id")):
             unlocked_payload = payload
 
     # If this browser already redeemed the PIN and has an active 48h cookie
     if unlocked_payload:
-        movie_id = unlocked_payload.get("shared_movie_id")
-        movie = db.query(Movie).filter(Movie.id == movie_id).first()
+        movie = None
+        shared_gid = unlocked_payload.get("shared_gdrive_file_id")
+        shared_fname = unlocked_payload.get("shared_file_name")
+        shared_mid = unlocked_payload.get("shared_movie_id")
+
+        if shared_gid:
+            movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+        if not movie and shared_fname:
+            movie = db.query(Movie).filter(Movie.file_name == shared_fname).first()
+        if not movie and shared_mid:
+            cand = db.query(Movie).filter(Movie.id == shared_mid).first()
+            if cand and (not shared_gid or cand.gdrive_file_id == shared_gid):
+                movie = cand
+
         if not movie:
-            raise HTTPException(status_code=404, detail="Movie not found")
+            return templates.TemplateResponse(
+                request=request,
+                name="share_source_missing.html",
+                context={
+                    "request": request,
+                    "movie_title": unlocked_payload.get("movie_title") or unlocked_payload.get("title", ""),
+                    "file_name": shared_fname or ""
+                },
+                status_code=404
+            )
 
         shared_user = User(
             id=0,
@@ -433,6 +661,9 @@ async def view_shared_movie(
         )
         setattr(shared_user, "is_shared", True)
         setattr(shared_user, "shared_movie_id", movie.id)
+        setattr(shared_user, "shared_gdrive_file_id", movie.gdrive_file_id)
+        setattr(shared_user, "shared_file_name", movie.file_name)
+        setattr(shared_user, "movie_title", movie.title)
         setattr(shared_user, "share_token", token)
 
         quality_versions = get_quality_versions(movie, db)
@@ -474,13 +705,22 @@ async def view_shared_movie(
             status_code=410
         )
 
-    movie = db.query(Movie).filter(Movie.id == share.movie_id).first()
+    movie = resolve_shared_movie(share, db, fallback_file_name=file)
     if not movie:
-        raise HTTPException(status_code=404, detail="Movie not found")
+        return templates.TemplateResponse(
+            request=request,
+            name="share_source_missing.html",
+            context={
+                "request": request,
+                "movie_title": getattr(share, "movie_title", "") or getattr(share, "file_name", ""),
+                "file_name": getattr(share, "file_name", "")
+            },
+            status_code=404
+        )
 
     # If the URL contains the PIN and matches, immediately auto-unlock and consume/delete the PIN!
     if pin and str(pin).strip() == str(share.pin_code).strip():
-        movie_id = share.movie_id
+        movie_id = movie.id
         # Consume and delete immediately from backend DB upon first hit
         db.delete(share)
         db.commit()
@@ -491,6 +731,9 @@ async def view_shared_movie(
             "role": "guest",
             "is_shared": True,
             "shared_movie_id": movie_id,
+            "shared_gdrive_file_id": movie.gdrive_file_id,
+            "shared_file_name": movie.file_name,
+            "movie_title": movie.title,
             "share_token": token
         }
         access_token = create_access_token(share_payload, expires_delta=timedelta(hours=48))
@@ -506,6 +749,9 @@ async def view_shared_movie(
         )
         setattr(shared_user, "is_shared", True)
         setattr(shared_user, "shared_movie_id", movie.id)
+        setattr(shared_user, "shared_gdrive_file_id", movie.gdrive_file_id)
+        setattr(shared_user, "shared_file_name", movie.file_name)
+        setattr(shared_user, "movie_title", movie.title)
         setattr(shared_user, "share_token", token)
 
         quality_versions = get_quality_versions(movie, db)
@@ -540,6 +786,9 @@ async def view_shared_movie(
     )
     setattr(shared_user, "is_shared", True)
     setattr(shared_user, "shared_movie_id", movie.id)
+    setattr(shared_user, "shared_gdrive_file_id", movie.gdrive_file_id)
+    setattr(shared_user, "shared_file_name", movie.file_name)
+    setattr(shared_user, "movie_title", movie.title)
     setattr(shared_user, "share_token", token)
 
     quality_versions = get_quality_versions(movie, db)
@@ -607,6 +856,16 @@ async def verify_share_pin(
             }
         )
 
+    movie = resolve_shared_movie(share, db, fallback_file_name=data.get("file"))
+    if not movie:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "detail": "The source movie file for this share link was removed from Google Drive and is no longer available to play."
+            }
+        )
+
     if share.pin_code != entered_pin:
         return JSONResponse(
             status_code=400,
@@ -617,7 +876,7 @@ async def verify_share_pin(
         )
 
     # PIN matches! Immediately delete from backend database so it can never be used again.
-    movie_id = share.movie_id
+    movie_id = movie.id
     db.delete(share)
     db.commit()
 
@@ -627,6 +886,9 @@ async def verify_share_pin(
         "role": "guest",
         "is_shared": True,
         "shared_movie_id": movie_id,
+        "shared_gdrive_file_id": movie.gdrive_file_id,
+        "shared_file_name": movie.file_name,
+        "movie_title": movie.title,
         "share_token": token
     }
     access_token = create_access_token(share_payload, expires_delta=timedelta(hours=48))

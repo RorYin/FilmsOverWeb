@@ -94,6 +94,9 @@ def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -
         )
         setattr(shared_user, "is_shared", True)
         setattr(shared_user, "shared_movie_id", payload.get("shared_movie_id"))
+        setattr(shared_user, "shared_gdrive_file_id", payload.get("shared_gdrive_file_id"))
+        setattr(shared_user, "shared_file_name", payload.get("shared_file_name"))
+        setattr(shared_user, "movie_title", payload.get("movie_title", ""))
         setattr(shared_user, "share_token", payload.get("share_token", ""))
         return shared_user
 
@@ -131,6 +134,16 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
                     target_id = int(path_parts[1].split(".")[0])
                     if target_id == getattr(user, "shared_movie_id", None):
                         allowed = True
+                    else:
+                        from app.models import Movie
+                        target_m = db.query(Movie).filter(Movie.id == target_id).first()
+                        if target_m:
+                            shared_gid = getattr(user, "shared_gdrive_file_id", None)
+                            shared_fname = getattr(user, "shared_file_name", None)
+                            if shared_gid and target_m.gdrive_file_id == shared_gid:
+                                allowed = True
+                            elif shared_fname and target_m.file_name == shared_fname:
+                                allowed = True
                 except ValueError:
                     pass
 

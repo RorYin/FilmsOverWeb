@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, Depends, Form, HTTPException, Background
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 import secrets
+from urllib.parse import quote
 from app.database import get_db, desc, Session
 from app.models import User, SystemSetting, TvLoginCode, MovieSharePin, Movie
 from app.config import settings
@@ -317,13 +318,17 @@ async def list_share_links(
     for l in links:
         m = l.movie
         c = l.created_by
-        full_url = f"{base_url}/share/{l.share_token}?pin={l.pin_code}"
+        fn = (m.file_name if m else l.file_name) or ""
+        file_param = f"&file={quote(fn)}" if fn else ""
+        full_url = f"{base_url}/share/{l.share_token}?pin={l.pin_code}{file_param}"
         enhanced_links.append({
             "id": l.id,
             "token": l.share_token,
             "pin": l.pin_code,
             "url": full_url,
             "movie": m,
+            "file_name": fn,
+            "movie_title": (m.title if m else l.movie_title) or "Unknown Movie",
             "created_by": c,
             "created_at": l.created_at
         })

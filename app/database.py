@@ -364,6 +364,9 @@ class JsonDatabase:
                 wp_col = self.collections.get("watch_progress", [])
                 self.collections["watch_progress"] = [p for p in wp_col if getattr(p, "episode_id", None) != obj.id]
 
+    def query(self, model_cls):
+        return JsonQuery(self, model_cls)
+
 class JsonQuery:
     def __init__(self, db, model_cls, items=None):
         self.db = db

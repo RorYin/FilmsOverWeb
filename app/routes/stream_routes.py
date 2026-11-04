@@ -164,12 +164,20 @@ async def stream_movie(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if getattr(user, "is_shared", False) and getattr(user, "shared_movie_id", None) != movie_id:
-        raise HTTPException(status_code=403, detail="Shared access denied for this movie")
-
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
+
+    if getattr(user, "is_shared", False):
+        is_allowed = False
+        if getattr(user, "shared_movie_id", None) == movie_id:
+            is_allowed = True
+        elif getattr(user, "shared_gdrive_file_id", None) and movie.gdrive_file_id == user.shared_gdrive_file_id:
+            is_allowed = True
+        elif getattr(user, "shared_file_name", None) and movie.file_name == user.shared_file_name:
+            is_allowed = True
+        if not is_allowed:
+            raise HTTPException(status_code=403, detail="Shared access denied for this movie")
 
     fn = movie.file_name.upper()
     is_mkv = movie.file_name.lower().endswith(".mkv")
@@ -200,12 +208,20 @@ async def stream_raw(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if getattr(user, "is_shared", False) and getattr(user, "shared_movie_id", None) != movie_id:
-        raise HTTPException(status_code=403, detail="Shared access denied for this movie")
-
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
+
+    if getattr(user, "is_shared", False):
+        is_allowed = False
+        if getattr(user, "shared_movie_id", None) == movie_id:
+            is_allowed = True
+        elif getattr(user, "shared_gdrive_file_id", None) and movie.gdrive_file_id == user.shared_gdrive_file_id:
+            is_allowed = True
+        elif getattr(user, "shared_file_name", None) and movie.file_name == user.shared_file_name:
+            is_allowed = True
+        if not is_allowed:
+            raise HTTPException(status_code=403, detail="Shared access denied for this movie")
 
     return await stream_gdrive_range(movie, request.headers.get("range"), db, is_head=(request.method == "HEAD"))
 
@@ -227,18 +243,28 @@ async def transmux_movie(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    if getattr(user, "is_shared", False) and getattr(user, "shared_movie_id", None) != movie_id:
-        raise HTTPException(status_code=403, detail="Shared access denied for this movie")
-
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
+
+    if getattr(user, "is_shared", False):
+        is_allowed = False
+        if getattr(user, "shared_movie_id", None) == movie_id:
+            is_allowed = True
+        elif getattr(user, "shared_gdrive_file_id", None) and movie.gdrive_file_id == user.shared_gdrive_file_id:
+            is_allowed = True
+        elif getattr(user, "shared_file_name", None) and movie.file_name == user.shared_file_name:
+            is_allowed = True
+        if not is_allowed:
+            raise HTTPException(status_code=403, detail="Shared access denied for this movie")
 
     # Generate internal auth token
     token_data = {"sub": user.email, "role": user.role}
     if getattr(user, "is_shared", False):
         token_data["is_shared"] = True
         token_data["shared_movie_id"] = movie.id
+        token_data["shared_gdrive_file_id"] = movie.gdrive_file_id
+        token_data["shared_file_name"] = movie.file_name
     auth_token = create_access_token(token_data)
     internal_port = os.environ.get("PORT", "8000")
     raw_url = f"http://127.0.0.1:{internal_port}/stream/raw/{movie.id}?token={auth_token}"

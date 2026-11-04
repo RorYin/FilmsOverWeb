@@ -226,6 +226,9 @@ class MovieSharePin(Base):
     id = Column(Integer, primary_key=True)
     share_token = Column(String(64), default="")
     movie_id = Column(Integer, default=None)
+    gdrive_file_id = Column(String(255), default="")
+    file_name = Column(String(500), default="")
+    movie_title = Column(String(500), default="")
     pin_code = Column(String(10), default="")  # 4-digit numeric code e.g. "8492"
     created_by_id = Column(Integer, default=None)
     created_at = Column(DateTime, default=utc_now)
@@ -233,7 +236,28 @@ class MovieSharePin(Base):
 
     @property
     def movie(self):
-        return get_json_db().get_by_id(Movie, self.movie_id)
+        db = get_json_db()
+        movies = db.get_collection(Movie)
+        # 1. Primary lookup by unique Google Drive file ID
+        if self.gdrive_file_id:
+            for m in movies:
+                if m.gdrive_file_id == self.gdrive_file_id:
+                    return m
+        # 2. Secondary lookup by file_name
+        if self.file_name:
+            for m in movies:
+                if m.file_name == self.file_name:
+                    return m
+        # 3. Fallback to movie_id if matching
+        if self.movie_id:
+            m = db.get_by_id(Movie, self.movie_id)
+            if m:
+                if self.gdrive_file_id and m.gdrive_file_id != self.gdrive_file_id:
+                    return None
+                if self.file_name and m.file_name != self.file_name:
+                    return None
+                return m
+        return None
 
     @property
     def created_by(self):
