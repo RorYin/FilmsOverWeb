@@ -146,7 +146,7 @@ async def stream_gdrive_range(media_item, range_header: Optional[str], db: Sessi
 
 @router.api_route("/stream/{movie_id}", methods=["GET", "HEAD", "OPTIONS"])
 async def stream_movie(
-    movie_id: int,
+    movie_id: str,
     request: Request,
     ss: float = 0.0,
     db: Session = Depends(get_db),
@@ -164,15 +164,17 @@ async def stream_movie(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    movie = db.query(Movie).filter(Movie.gdrive_file_id == str(movie_id)).first()
+    if not movie and str(movie_id).isdigit():
+        movie = db.query(Movie).filter(Movie.id == int(movie_id)).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
     if getattr(user, "is_shared", False):
         is_allowed = False
-        if getattr(user, "shared_movie_id", None) == movie_id:
+        if getattr(user, "shared_gdrive_file_id", None) and movie.gdrive_file_id == user.shared_gdrive_file_id:
             is_allowed = True
-        elif getattr(user, "shared_gdrive_file_id", None) and movie.gdrive_file_id == user.shared_gdrive_file_id:
+        elif getattr(user, "shared_movie_id", None) and str(user.shared_movie_id) == str(movie_id):
             is_allowed = True
         elif getattr(user, "shared_file_name", None) and movie.file_name == user.shared_file_name:
             is_allowed = True
@@ -184,13 +186,13 @@ async def stream_movie(
     has_audio_codecs = any(x in fn for x in ["DD+", "DDP", "DTS", "TRUEHD", "ATMOS", "AC3", "EAC3"])
 
     if is_mkv or has_audio_codecs or ss > 0.0:
-        return await transmux_movie(movie_id, request, ss, db, user)
+        return await transmux_movie(str(movie.id), request, ss, db, user)
     else:
         return await stream_gdrive_range(movie, request.headers.get("range"), db, is_head=(request.method == "HEAD"))
 
 @router.api_route("/stream/raw/{movie_id}", methods=["GET", "HEAD", "OPTIONS"])
 async def stream_raw(
-    movie_id: int,
+    movie_id: str,
     request: Request,
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional)
@@ -208,15 +210,17 @@ async def stream_raw(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    movie = db.query(Movie).filter(Movie.gdrive_file_id == str(movie_id)).first()
+    if not movie and str(movie_id).isdigit():
+        movie = db.query(Movie).filter(Movie.id == int(movie_id)).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
     if getattr(user, "is_shared", False):
         is_allowed = False
-        if getattr(user, "shared_movie_id", None) == movie_id:
+        if getattr(user, "shared_gdrive_file_id", None) and movie.gdrive_file_id == user.shared_gdrive_file_id:
             is_allowed = True
-        elif getattr(user, "shared_gdrive_file_id", None) and movie.gdrive_file_id == user.shared_gdrive_file_id:
+        elif getattr(user, "shared_movie_id", None) and str(user.shared_movie_id) == str(movie_id):
             is_allowed = True
         elif getattr(user, "shared_file_name", None) and movie.file_name == user.shared_file_name:
             is_allowed = True
@@ -227,7 +231,7 @@ async def stream_raw(
 
 @router.get("/stream/transmux/{movie_id}")
 async def transmux_movie(
-    movie_id: int,
+    movie_id: str,
     request: Request,
     ss: float = 0.0,
     db: Session = Depends(get_db),
@@ -243,7 +247,9 @@ async def transmux_movie(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    movie = db.query(Movie).filter(Movie.gdrive_file_id == str(movie_id)).first()
+    if not movie and str(movie_id).isdigit():
+        movie = db.query(Movie).filter(Movie.id == int(movie_id)).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 

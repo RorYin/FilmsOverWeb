@@ -319,11 +319,12 @@ async def list_share_links(
         m = l.movie
         c = l.created_by
         fn = (m.file_name if m else l.file_name) or ""
-        file_param = f"&file={quote(fn)}" if fn else ""
-        full_url = f"{base_url}/share/{l.share_token}?pin={l.pin_code}{file_param}"
+        gdrive_id = l.gdrive_file_id or (m.gdrive_file_id if m else l.share_token)
+        full_url = f"{base_url}/share/{gdrive_id}?pin={l.pin_code}"
         enhanced_links.append({
             "id": l.id,
-            "token": l.share_token,
+            "token": gdrive_id,
+            "gdrive_file_id": gdrive_id,
             "pin": l.pin_code,
             "url": full_url,
             "movie": m,

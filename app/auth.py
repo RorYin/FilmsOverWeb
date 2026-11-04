@@ -51,23 +51,31 @@ def get_token_from_request(request: Request) -> Optional[str]:
     if fow_token:
         return fow_token
 
-    # Check shared token cookies
+    # Check specific cookie if path is movie-specific
+    path_parts = request.url.path.strip("/").split("/")
+    if len(path_parts) >= 2 and path_parts[0] in ["watch", "stream", "movie", "api", "share"]:
+        target = path_parts[1].split(".")[0]
+        # 1. Exact cookie for this target (gdrive_file_id or id)
+        direct_cookie = request.cookies.get(f"fow_share_{target}")
+        if direct_cookie:
+            return direct_cookie
+        direct_movie_cookie = request.cookies.get(f"fow_share_movie_{target}")
+        if direct_movie_cookie:
+            return direct_movie_cookie
+
+        # 2. Match cookie payload to this specific target
+        for c_name, c_val in request.cookies.items():
+            if c_name.startswith("fow_share_"):
+                p = decode_access_token(c_val)
+                if p and p.get("is_shared"):
+                    if p.get("shared_gdrive_file_id") == target or str(p.get("shared_movie_id")) == target:
+                        return c_val
+
+    # Fallback for general share cookies if present
     share_cookie = request.cookies.get("fow_share_token")
     if share_cookie:
         return share_cookie
 
-    # Check movie-specific cookie if path contains movie id
-    path_parts = request.url.path.strip("/").split("/")
-    if len(path_parts) >= 2 and path_parts[0] in ["watch", "stream", "movie", "api"]:
-        try:
-            m_id = path_parts[1].split(".")[0]
-            movie_cookie = request.cookies.get(f"fow_share_movie_{m_id}")
-            if movie_cookie:
-                return movie_cookie
-        except Exception:
-            pass
-
-    # Check any fow_share_ cookie in request
     for c_name, c_val in request.cookies.items():
         if c_name.startswith("fow_share_"):
             return c_val
@@ -130,22 +138,29 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         elif path.startswith("/movie/") or path.startswith("/watch/") or path.startswith("/stream/") or path.startswith("/api/movies/"):
             path_parts = path.strip("/").split("/")
             if len(path_parts) >= 2:
-                try:
-                    target_id = int(path_parts[1].split(".")[0])
-                    if target_id == getattr(user, "shared_movie_id", None):
-                        allowed = True
-                    else:
-                        from app.models import Movie
-                        target_m = db.query(Movie).filter(Movie.id == target_id).first()
-                        if target_m:
-                            shared_gid = getattr(user, "shared_gdrive_file_id", None)
-                            shared_fname = getattr(user, "shared_file_name", None)
-                            if shared_gid and target_m.gdrive_file_id == shared_gid:
-                                allowed = True
-                            elif shared_fname and target_m.file_name == shared_fname:
-                                allowed = True
-                except ValueError:
-                    pass
+                target_ident = path_parts[1].split(".")[0]
+                shared_gid = getattr(user, "shared_gdrive_file_id", None)
+                shared_fname = getattr(user, "shared_file_name", None)
+                shared_mid = getattr(user, "shared_movie_id", None)
+
+                # 1. Direct match with shared_gdrive_file_id
+                if shared_gid and target_ident == shared_gid:
+                    allowed = True
+                # 2. Direct match with shared_movie_id
+                elif shared_mid is not None and str(shared_mid) == target_ident:
+                    allowed = True
+                else:
+                    # 3. Lookup target in DB (by gdrive_file_id or integer id)
+                    from app.models import Movie
+                    target_m = db.query(Movie).filter(Movie.gdrive_file_id == target_ident).first()
+                    if not target_m and target_ident.isdigit():
+                        target_m = db.query(Movie).filter(Movie.id == int(target_ident)).first()
+
+                    if target_m:
+                        if shared_gid and target_m.gdrive_file_id == shared_gid:
+                            allowed = True
+                        elif shared_fname and target_m.file_name == shared_fname:
+                            allowed = True
 
         if not allowed:
             accept = request.headers.get("accept", "")
