@@ -42,8 +42,37 @@ def get_token_from_request(request: Request) -> Optional[str]:
     query_token = request.query_params.get("token")
     if query_token:
         return query_token
+    # Check share_token query param
+    share_token_param = request.query_params.get("share_token")
+    if share_token_param:
+        return share_token_param
     # Check HTTP-only cookie
-    return request.cookies.get(COOKIE_NAME)
+    fow_token = request.cookies.get(COOKIE_NAME)
+    if fow_token:
+        return fow_token
+
+    # Check shared token cookies
+    share_cookie = request.cookies.get("fow_share_token")
+    if share_cookie:
+        return share_cookie
+
+    # Check movie-specific cookie if path contains movie id
+    path_parts = request.url.path.strip("/").split("/")
+    if len(path_parts) >= 2 and path_parts[0] in ["watch", "stream", "movie", "api"]:
+        try:
+            m_id = path_parts[1].split(".")[0]
+            movie_cookie = request.cookies.get(f"fow_share_movie_{m_id}")
+            if movie_cookie:
+                return movie_cookie
+        except Exception:
+            pass
+
+    # Check any fow_share_ cookie in request
+    for c_name, c_val in request.cookies.items():
+        if c_name.startswith("fow_share_"):
+            return c_val
+
+    return None
 
 def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
     token = get_token_from_request(request)
@@ -52,6 +81,22 @@ def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -
     payload = decode_access_token(token)
     if not payload:
         return None
+
+    # Handle ephemeral 48h shared viewer access
+    if payload.get("is_shared"):
+        shared_user = User(
+            id=0,
+            email=payload.get("sub", "shared_viewer@guest"),
+            name="Shared Guest",
+            role="guest",
+            is_active=True,
+            must_change_password=False
+        )
+        setattr(shared_user, "is_shared", True)
+        setattr(shared_user, "shared_movie_id", payload.get("shared_movie_id"))
+        setattr(shared_user, "share_token", payload.get("share_token", ""))
+        return shared_user
+
     email = payload.get("sub")
     if not email:
         return None
@@ -72,6 +117,35 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # Restrict shared pass viewers strictly to the single shared movie and its media stream
+    if getattr(user, "is_shared", False):
+        path = request.url.path
+        allowed = False
+        if path.startswith("/static") or path.startswith("/share"):
+            allowed = True
+        elif path.startswith("/movie/") or path.startswith("/watch/") or path.startswith("/stream/") or path.startswith("/api/movies/"):
+            path_parts = path.strip("/").split("/")
+            if len(path_parts) >= 2:
+                try:
+                    target_id = int(path_parts[1].split(".")[0])
+                    if target_id == getattr(user, "shared_movie_id", None):
+                        allowed = True
+                except ValueError:
+                    pass
+
+        if not allowed:
+            accept = request.headers.get("accept", "")
+            if "text/html" in accept or request.method == "GET":
+                raise HTTPException(
+                    status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+                    headers={"Location": f"/login?next={request.url.path}"}
+                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied. Shared pass is restricted exclusively to the shared movie."
+            )
+        return user
 
     # Enforce password change for users flagged with must_change_password
     path = request.url.path

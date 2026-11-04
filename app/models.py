@@ -219,3 +219,24 @@ class TvLoginCode(Base):
     def created_by(self):
         return get_json_db().get_by_id(User, self.created_by_id)
 
+
+class MovieSharePin(Base):
+    __tablename__ = "movie_share_pins"
+
+    id = Column(Integer, primary_key=True)
+    share_token = Column(String(64), default="")
+    movie_id = Column(Integer, default=None)
+    pin_code = Column(String(10), default="")  # 4-digit numeric code e.g. "8492"
+    created_by_id = Column(Integer, default=None)
+    created_at = Column(DateTime, default=utc_now)
+    expires_at = Column(DateTime, default=None)
+
+    @property
+    def movie(self):
+        return get_json_db().get_by_id(Movie, self.movie_id)
+
+    @property
+    def created_by(self):
+        return get_json_db().get_by_id(User, self.created_by_id)
+
+

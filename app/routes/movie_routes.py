@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import Optional
-from app.database import get_db, desc, Session
-from app.models import Movie, Series, Episode, WatchProgress, User
-from app.auth import get_current_user
+from datetime import datetime, timezone, timedelta
+import secrets
+from app.database import get_db, desc, Session, utc_now
+from app.models import Movie, Series, Episode, WatchProgress, User, MovieSharePin
+from app.auth import get_current_user, require_role, decode_access_token, create_access_token
 
 router = APIRouter(tags=["Movies & Library"])
 templates = Jinja2Templates(directory="app/templates")
@@ -275,7 +277,16 @@ async def watch_player(
     initial_time = progress.position_seconds if progress and not progress.completed else 0.0
 
     from app.auth import create_access_token
-    user_token = create_access_token({"sub": user.email, "role": user.role})
+    from datetime import timedelta
+    token_data = {"sub": user.email, "role": user.role}
+    if getattr(user, "is_shared", False):
+        token_data["is_shared"] = True
+        token_data["shared_movie_id"] = movie.id
+        token_data["share_token"] = getattr(user, "share_token", "")
+    user_token = create_access_token(
+        token_data,
+        expires_delta=timedelta(hours=48) if getattr(user, "is_shared", False) else None
+    )
 
     # Check if movie container or audio needs universal transmuxing
     filename_upper = movie.file_name.upper()
@@ -312,4 +323,280 @@ async def watch_player(
             "gdrive_access_token": gdrive_access_token or ""
         }
     )
+
+
+# --- SuperAdmin Movie Share & 4-Digit PIN Access ---
+
+def cleanup_expired_share_pins(db: Session):
+    """Purge any share pin entries older than 48 hours."""
+    now = utc_now()
+    pins = db.query(MovieSharePin).all()
+    changed = False
+    for p in pins:
+        if p.expires_at and p.expires_at < now:
+            db.delete(p)
+            changed = True
+    if changed:
+        db.commit()
+
+@router.post("/api/superadmin/movies/{movie_id}/share")
+async def generate_movie_share(
+    movie_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(["superadmin"]))
+):
+    """
+    SuperAdmin generates a 48h shareable link with a 4-digit PIN for this movie.
+    """
+    movie = db.query(Movie).filter(Movie.id == movie_id).first()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    cleanup_expired_share_pins(db)
+
+    # 4-digit numeric PIN: "0000" to "9999"
+    pin_code = f"{secrets.randbelow(10000):04d}"
+    # Cryptographically secure URL-safe share token
+    share_token = secrets.token_urlsafe(20)
+    expires_at = utc_now() + timedelta(hours=48)
+
+    share_record = MovieSharePin(
+        share_token=share_token,
+        movie_id=movie.id,
+        pin_code=pin_code,
+        created_by_id=user.id,
+        created_at=utc_now(),
+        expires_at=expires_at
+    )
+    db.add(share_record)
+    db.commit()
+
+    base_url = str(request.base_url).rstrip("/")
+    share_url = f"{base_url}/share/{share_token}"
+
+    return JSONResponse({
+        "success": True,
+        "share_token": share_token,
+        "share_url": share_url,
+        "pin_code": pin_code,
+        "expires_in_hours": 48,
+        "movie_title": movie.title,
+        "movie_year": movie.year
+    })
+
+@router.get("/share/{token}", response_class=HTMLResponse)
+async def view_shared_movie(
+    token: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Public entry point for a shared movie link.
+    Only allows seeing this movie's details.
+    Playback requires entering the 4-digit PIN (or active 48h browser cookie).
+    """
+    cleanup_expired_share_pins(db)
+
+    # Check if this browser already has a valid 48-hour share cookie for this share/movie
+    cookie_token = (
+        request.cookies.get(f"fow_share_{token}") or
+        request.cookies.get("fow_share_token") or
+        request.query_params.get("share_token")
+    )
+    unlocked_payload = None
+    if cookie_token:
+        payload = decode_access_token(cookie_token)
+        if payload and payload.get("is_shared") and (payload.get("share_token") == token or payload.get("shared_movie_id")):
+            unlocked_payload = payload
+
+    # If this browser already redeemed the PIN and has an active 48h cookie
+    if unlocked_payload:
+        movie_id = unlocked_payload.get("shared_movie_id")
+        movie = db.query(Movie).filter(Movie.id == movie_id).first()
+        if not movie:
+            raise HTTPException(status_code=404, detail="Movie not found")
+
+        shared_user = User(
+            id=0,
+            name="Shared Guest",
+            email=unlocked_payload.get("sub", "shared_viewer@guest"),
+            role="guest",
+            is_active=True,
+            must_change_password=False
+        )
+        setattr(shared_user, "is_shared", True)
+        setattr(shared_user, "shared_movie_id", movie.id)
+        setattr(shared_user, "share_token", token)
+
+        quality_versions = get_quality_versions(movie, db)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="movie_detail.html",
+            context={
+                "user": shared_user,
+                "movie": movie,
+                "progress": None,
+                "quality_versions": quality_versions,
+                "related_movies": [],
+                "is_share_page": True,
+                "is_unlocked": True,
+                "share_token": token
+            }
+        )
+
+    # If not yet unlocked on this browser, look up the share in the DB
+    share = db.query(MovieSharePin).filter(MovieSharePin.share_token == token).first()
+
+    # If not found in DB and no cookie, the link either expired or was already used on another browser
+    if not share:
+        return templates.TemplateResponse(
+            request=request,
+            name="share_expired.html",
+            context={"request": request},
+            status_code=404
+        )
+
+    if share.expires_at and share.expires_at < utc_now():
+        db.delete(share)
+        db.commit()
+        return templates.TemplateResponse(
+            request=request,
+            name="share_expired.html",
+            context={"request": request},
+            status_code=410
+        )
+
+    movie = db.query(Movie).filter(Movie.id == share.movie_id).first()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Movie not found")
+
+    shared_user = User(
+        id=0,
+        name="Shared Guest",
+        email="guest@shared.link",
+        role="guest",
+        is_active=True,
+        must_change_password=False
+    )
+    setattr(shared_user, "is_shared", True)
+    setattr(shared_user, "shared_movie_id", movie.id)
+    setattr(shared_user, "share_token", token)
+
+    quality_versions = get_quality_versions(movie, db)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="movie_detail.html",
+        context={
+            "user": shared_user,
+            "movie": movie,
+            "progress": None,
+            "quality_versions": quality_versions,
+            "related_movies": [],
+            "is_share_page": True,
+            "is_unlocked": False,
+            "share_token": token
+        }
+    )
+
+@router.post("/api/share/{token}/verify")
+async def verify_share_pin(
+    token: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Validates the 4-digit PIN for a shared movie.
+    Upon first correct entry:
+    1. The PIN and share record are immediately EXPIRED & DELETED from database.
+    2. A 48-hour secure authorization cookie is set for this browser.
+    3. No other device or browser can ever reuse the PIN.
+    """
+    data = await request.json()
+    entered_pin = str(data.get("pin", "")).strip()
+
+    cleanup_expired_share_pins(db)
+
+    share = db.query(MovieSharePin).filter(MovieSharePin.share_token == token).first()
+    if not share:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "detail": "This share link has expired or has already been redeemed on another browser/device."
+            }
+        )
+
+    if share.expires_at and share.expires_at < utc_now():
+        db.delete(share)
+        db.commit()
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "detail": "This share PIN has expired (48-hour validity limit)."
+            }
+        )
+
+    if share.pin_code != entered_pin:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "detail": "Incorrect 4-digit PIN code. Please check and try again."
+            }
+        )
+
+    # PIN matches! Immediately delete from backend database so it can never be used again.
+    movie_id = share.movie_id
+    db.delete(share)
+    db.commit()
+
+    # Create 48-hour browser access token
+    share_payload = {
+        "sub": f"shared_viewer_{token[:10]}",
+        "role": "guest",
+        "is_shared": True,
+        "shared_movie_id": movie_id,
+        "share_token": token
+    }
+    access_token = create_access_token(share_payload, expires_delta=timedelta(hours=48))
+
+    max_age_48h = 48 * 3600
+
+    resp = JSONResponse({
+        "success": True,
+        "message": "PIN verified successfully! 48-hour access enabled on this browser.",
+        "token": access_token,
+        "movie_id": movie_id,
+        "watch_url": f"/watch/{movie_id}?share_token={access_token}"
+    })
+
+    # Set cookies on browser
+    resp.set_cookie(
+        key=f"fow_share_{token}",
+        value=access_token,
+        max_age=max_age_48h,
+        httponly=True,
+        samesite="lax"
+    )
+    resp.set_cookie(
+        key=f"fow_share_movie_{movie_id}",
+        value=access_token,
+        max_age=max_age_48h,
+        httponly=True,
+        samesite="lax"
+    )
+    resp.set_cookie(
+        key="fow_share_token",
+        value=access_token,
+        max_age=max_age_48h,
+        httponly=True,
+        samesite="lax"
+    )
+
+    return resp
+
 

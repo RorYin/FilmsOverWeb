@@ -204,7 +204,8 @@ class JsonDatabase:
             "episodes": [],
             "system_settings": [],
             "watch_progress": [],
-            "tv_login_codes": []
+            "tv_login_codes": [],
+            "movie_share_pins": []
         }
         self.load()
 
@@ -354,6 +355,8 @@ class JsonDatabase:
             elif table_name == "movies":
                 wp_col = self.collections.get("watch_progress", [])
                 self.collections["watch_progress"] = [p for p in wp_col if getattr(p, "movie_id", None) != obj.id]
+                share_col = self.collections.get("movie_share_pins", [])
+                self.collections["movie_share_pins"] = [s for s in share_col if getattr(s, "movie_id", None) != obj.id]
             elif table_name == "series":
                 ep_col = self.collections.get("episodes", [])
                 self.collections["episodes"] = [e for e in ep_col if getattr(e, "series_id", None) != obj.id]

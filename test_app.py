@@ -881,6 +881,159 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertIsNone(db.query(TvLoginCode).filter(TvLoginCode.id == code_id).first())
         db.close()
 
+    def test_19_superadmin_movie_share_and_48h_pin_security(self):
+        """
+        Test SuperAdmin-only movie share PIN generation, public view-only details,
+        4-digit PIN verification, immediate DB deletion upon verification, single-use enforcement,
+        48-hour unlocked streaming cookie, and guest access containment.
+        """
+        from app.models import MovieSharePin, Movie, User
+        from app.auth import decode_access_token, COOKIE_NAME
+        from datetime import datetime, timezone, timedelta
+
+        db = SessionLocal()
+        movie = db.query(Movie).first()
+        self.assertIsNotNone(movie, "At least one movie must exist in DB for share testing")
+        movie_id = movie.id
+        movie_title = movie.title
+        db.close()
+
+        # 1. Unauthenticated or non-superadmin cannot generate share links
+        anon_client = TestClient(app)
+        anon_gen = anon_client.post(f"/api/superadmin/movies/{movie_id}/share", follow_redirects=False)
+        self.assertEqual(anon_gen.status_code, 307)
+        self.assertIn("/login", anon_gen.headers.get("location", ""))
+
+        guest_client = TestClient(app)
+        guest_client.post("/login", data={"email": "guest@filmsoverweb.com", "password": "guest@123", "next": "/"})
+        guest_gen = guest_client.post(f"/api/superadmin/movies/{movie_id}/share", follow_redirects=False)
+        self.assertEqual(guest_gen.status_code, 403)
+
+        # 2. SuperAdmin generates 48h share link & PIN
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={"email": "test@gmail.com", "password": "1q2w3e4r5t", "next": "/"})
+        gen_resp = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        self.assertEqual(gen_resp.status_code, 200)
+        data = gen_resp.json()
+        self.assertTrue(data.get("success"))
+        token = data.get("share_token")
+        pin = data.get("pin_code")
+        self.assertIsNotNone(token)
+        self.assertEqual(len(pin), 4)
+        self.assertTrue(pin.isdigit())
+
+        # Verify entry exists in DB
+        db = SessionLocal()
+        pin_obj = db.query(MovieSharePin).filter(MovieSharePin.share_token == token).first()
+        self.assertIsNotNone(pin_obj)
+        self.assertEqual(pin_obj.pin_code, pin)
+        self.assertEqual(pin_obj.movie_id, movie_id)
+        db.close()
+
+        # 3. Public user opens GET /share/{token} without being logged in
+        viewer_client = TestClient(app)
+        share_page = viewer_client.get(f"/share/{token}")
+        self.assertEqual(share_page.status_code, 200)
+        self.assertIn(movie_title.encode("utf-8"), share_page.content)
+        self.assertIn(b"Enter 4-Digit PIN", share_page.content)
+        self.assertIn(b"Private Shared Screening", share_page.content)
+        # Should not show direct watch button when locked
+        self.assertNotIn(b"Watch Now (Unlocked)", share_page.content)
+
+        # 4. Viewer tries submitting an incorrect PIN -> 400 error
+        wrong_pin = "0000" if pin != "0000" else "1111"
+        wrong_pin_resp = viewer_client.post(f"/api/share/{token}/verify", json={"pin": wrong_pin})
+        self.assertEqual(wrong_pin_resp.status_code, 400)
+        wrong_data = wrong_pin_resp.json()
+        self.assertFalse(wrong_data.get("success"))
+        self.assertIn("Incorrect 4-digit PIN", wrong_data.get("detail", ""))
+
+        # Verify PIN still in DB
+        db = SessionLocal()
+        self.assertIsNotNone(db.query(MovieSharePin).filter(MovieSharePin.share_token == token).first())
+        db.close()
+
+        # 5. Viewer enters the correct PIN -> Success!
+        verify_resp = viewer_client.post(f"/api/share/{token}/verify", json={"pin": pin})
+        self.assertEqual(verify_resp.status_code, 200)
+        verify_data = verify_resp.json()
+        self.assertTrue(verify_data.get("success"))
+        self.assertIn("watch_url", verify_data)
+        jwt_token = verify_data.get("token")
+        self.assertIsNotNone(jwt_token)
+
+        # Verify 48h cookie was set
+        cookie_header = verify_resp.headers.get("set-cookie", "")
+        self.assertIn(f"fow_share_{token}", cookie_header)
+        self.assertIn(f"fow_share_movie_{movie_id}", cookie_header)
+        self.assertIn("Max-Age=172800", cookie_header)  # 48 hours = 172800 seconds
+
+        # 6. CRUCIAL: Verify that the PIN is immediately DELETED from the database
+        db = SessionLocal()
+        deleted_pin_obj = db.query(MovieSharePin).filter(MovieSharePin.share_token == token).first()
+        self.assertIsNone(deleted_pin_obj, "The PIN must be deleted from DB upon first verification")
+        db.close()
+
+        # 7. Another browser / device attempts to use the same PIN or link -> Fails!
+        second_device = TestClient(app)
+        second_verify = second_device.post(f"/api/share/{token}/verify", json={"pin": pin})
+        self.assertEqual(second_verify.status_code, 400)
+        self.assertIn("expired or has already been redeemed", second_verify.json().get("detail", ""))
+
+        second_page = second_device.get(f"/share/{token}")
+        self.assertEqual(second_page.status_code, 404)
+        self.assertIn(b"Share Link Expired", second_page.content)
+
+        # 8. Original viewer's browser now visits GET /share/{token} -> Unlocked!
+        unlocked_page = viewer_client.get(f"/share/{token}")
+        self.assertEqual(unlocked_page.status_code, 200)
+        self.assertIn(b"PIN Verified", unlocked_page.content)
+        self.assertIn(b"Unlocked", unlocked_page.content)
+
+        # 9. Original viewer can access /watch/{movie_id} and stream playback
+        watch_resp = viewer_client.get(f"/watch/{movie_id}")
+        self.assertEqual(watch_resp.status_code, 200)
+        self.assertIn(movie_title.encode("utf-8"), watch_resp.content)
+        self.assertIn(b"movi-player", watch_resp.content)
+
+        # 10. Access Restriction Check: Viewer CANNOT access other movies or library pages
+        movies_resp = viewer_client.get("/movies", follow_redirects=False)
+        self.assertIn(movies_resp.status_code, [307, 403])
+
+        series_resp = viewer_client.get("/series", follow_redirects=False)
+        self.assertIn(series_resp.status_code, [307, 403])
+
+        admin_resp = viewer_client.get("/admin/folders", follow_redirects=False)
+        self.assertIn(admin_resp.status_code, [307, 403])
+
+        # Viewer CANNOT watch any other movie
+        db = SessionLocal()
+        other_movie = db.query(Movie).filter(Movie.id != movie_id).first()
+        db.close()
+        if other_movie:
+            other_watch = viewer_client.get(f"/watch/{other_movie.id}", follow_redirects=False)
+            self.assertIn(other_watch.status_code, [307, 403])
+
+        # 11. Test that an expired PIN link (older than 48 hours) is cleaned up and rejected
+        admin_resp2 = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        token2 = admin_resp2.json().get("share_token")
+        
+        # Manually backdate expires_at
+        db = SessionLocal()
+        share2 = db.query(MovieSharePin).filter(MovieSharePin.share_token == token2).first()
+        share2.expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        db.commit()
+        db.close()
+
+        # Accessing expired share link renders share_expired.html and deletes from DB
+        expired_page = anon_client.get(f"/share/{token2}")
+        self.assertIn(expired_page.status_code, [404, 410])
+        self.assertIn(b"Share Link Expired", expired_page.content)
+
+        db = SessionLocal()
+        self.assertIsNone(db.query(MovieSharePin).filter(MovieSharePin.share_token == token2).first())
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

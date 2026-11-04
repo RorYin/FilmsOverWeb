@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Share Link Expired - FilmsOverWeb{% endblock %}
+
+{% block content %}
+<div class="min-h-[70vh] flex items-center justify-center px-4 py-16">
+    <div class="max-w-md w-full bg-brand-surface/90 border border-brand-border rounded-2xl p-8 shadow-2xl backdrop-blur-xl text-center space-y-6">
+        <div class="w-20 h-20 mx-auto rounded-full bg-amber-500/10 border-2 border-amber-500/30 flex items-center justify-center text-amber-400 shadow-lg shadow-amber-500/10">
+            <i data-lucide="clock" class="w-10 h-10"></i>
+        </div>
+
+        <div class="space-y-2">
+            <h1 class="text-2xl font-black text-white tracking-tight">Share Link Expired</h1>
+            <p class="text-slate-400 text-sm leading-relaxed">
+                This exclusive movie share link has expired or was already redeemed on another browser or device.
+            </p>
+        </div>
+
+        <div class="bg-black/40 border border-brand-border/60 rounded-xl p-4 text-xs text-slate-400 text-left space-y-2">
+            <div class="flex items-start space-x-2">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400 flex-none mt-0.5"></i>
+                <span>FilmsOverWeb share PINs are strictly single-device and valid for 48 hours.</span>
+            </div>
+            <div class="flex items-start space-x-2">
+                <i data-lucide="info" class="w-4 h-4 text-brand-blue flex-none mt-0.5"></i>
+                <span>Once verified on a browser, the PIN is permanently redeemed and deleted from the system.</span>
+            </div>
+        </div>
+
+        <div class="pt-2">
+            <a href="/login" class="inline-flex items-center justify-center space-x-2 w-full bg-brand-red hover:bg-brand-redHover text-black py-3 px-5 rounded-xl font-bold text-sm shadow-lg shadow-brand-red/20 transition transform hover:scale-[1.02]">
+                <i data-lucide="log-in" class="w-4 h-4"></i>
+                <span>Sign In to FilmsOverWeb</span>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -24,7 +24,7 @@
             <div class="flex items-center justify-between h-16">
                 <!-- Brand / Logo -->
                 <div class="flex items-center space-x-8">
-                    <a href="/" class="flex items-center space-x-2 text-2xl font-black tracking-wider group">
+                    <a href="{% if user and user.is_shared %}/movie/{{ user.shared_movie_id }}{% else %}/{% endif %}" class="flex items-center space-x-2 text-2xl font-black tracking-wider group">
                         <span class="p-1.5 bg-brand-red rounded-lg group-hover:scale-105 transition-transform duration-200">
                             <i data-lucide="clapperboard" class="w-6 h-6 text-black"></i>
                         </span>
@@ -32,7 +32,7 @@
                     </a>
                     
                     <!-- Main Navigation Links: Movies & TV Shows -->
-                    {% if user %}
+                    {% if user and not user.is_shared %}
                     <div class="hidden md:flex items-center space-x-2 text-sm font-medium">
                         <a href="/movies" class="px-3.5 py-1.5 rounded-xl transition {% if request.url.path.startswith('/movies') %}text-brand-red bg-brand-surface font-semibold{% else %}text-slate-300 hover:text-white hover:bg-brand-surface{% endif %}">
                             Movies
@@ -46,13 +46,21 @@
 
                 <!-- Right Actions -->
                 <div class="flex items-center space-x-4">
-                    {% if user %}
+                    {% if user and not user.is_shared %}
                     <!-- Search Bar Form -->
                     <form action="/movies" method="GET" class="relative hidden sm:block">
                         <input type="text" name="q" placeholder="Search movies, actors..." value="{{ q or '' }}" class="bg-brand-surface border border-brand-border text-sm text-slate-200 rounded-full pl-9 pr-4 py-1.5 focus:outline-none focus:border-brand-red w-48 lg:w-64 transition-all">
                         <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
                     </form>
+                    {% endif %}
 
+                    {% if user %}
+                    {% if user.is_shared %}
+                    <div class="flex items-center space-x-2 bg-amber-500/15 border border-amber-500/40 px-3.5 py-1.5 rounded-full text-xs font-bold text-amber-300 shadow-sm">
+                        <i data-lucide="ticket" class="w-4 h-4 text-amber-400"></i>
+                        <span>48h Guest Pass</span>
+                    </div>
+                    {% else %}
                     <!-- User Profile Pill & Comprehensive Management Dropdown -->
                     <div class="relative" id="user-menu-container">
                         <button type="button" id="user-menu-button" aria-expanded="false" aria-haspopup="true" class="flex items-center space-x-2 bg-brand-surface border border-brand-border px-3 py-1.5 rounded-full hover:border-slate-500 focus:outline-none transition cursor-pointer select-none">
@@ -131,6 +139,7 @@
                             </a>
                         </div>
                     </div>
+                    {% endif %}
                     {% else %}
                     <a href="/login" class="bg-brand-red hover:bg-brand-redHover text-black px-5 py-2 rounded-xl font-bold text-sm shadow-md transition">Sign In</a>
                     {% endif %}

@@ -164,6 +164,9 @@ async def stream_movie(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    if getattr(user, "is_shared", False) and getattr(user, "shared_movie_id", None) != movie_id:
+        raise HTTPException(status_code=403, detail="Shared access denied for this movie")
+
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
@@ -197,6 +200,9 @@ async def stream_raw(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    if getattr(user, "is_shared", False) and getattr(user, "shared_movie_id", None) != movie_id:
+        raise HTTPException(status_code=403, detail="Shared access denied for this movie")
+
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
@@ -221,12 +227,19 @@ async def transmux_movie(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    if getattr(user, "is_shared", False) and getattr(user, "shared_movie_id", None) != movie_id:
+        raise HTTPException(status_code=403, detail="Shared access denied for this movie")
+
     movie = db.query(Movie).filter(Movie.id == movie_id).first()
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
     # Generate internal auth token
-    auth_token = create_access_token({"sub": user.email, "role": user.role})
+    token_data = {"sub": user.email, "role": user.role}
+    if getattr(user, "is_shared", False):
+        token_data["is_shared"] = True
+        token_data["shared_movie_id"] = movie.id
+    auth_token = create_access_token(token_data)
     internal_port = os.environ.get("PORT", "8000")
     raw_url = f"http://127.0.0.1:{internal_port}/stream/raw/{movie.id}?token={auth_token}"
 
@@ -330,6 +343,8 @@ async def update_watch_progress(
     user: User = Depends(get_current_user)
 ):
     """Save user's playback position to resume later."""
+    if getattr(user, "is_shared", False):
+        return JSONResponse({"status": "ignored_for_shared_guest"})
     data = await request.json()
     position = float(data.get("position", 0.0))
     duration = float(data.get("duration", 0.0))
