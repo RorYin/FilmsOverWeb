@@ -302,3 +302,55 @@ nav button.tv-focused i {
     border-color: #fbbf24 !important;
 }
 
+/* Universal Fixed & Modal Overlay Utilities (Cross-Platform, Web & Smart TVs) */
+.fixed, [class*="fixed"] {
+    position: fixed !important;
+}
+
+.fow-modal-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background-color: rgba(0, 0, 0, 0.82) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    z-index: 99999 !important;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    box-sizing: border-box;
+    overflow-y: auto;
+}
+
+.fow-modal-overlay.active {
+    display: flex !important;
+}
+
+.fow-modal-card {
+    position: relative !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    background-color: #12151c !important;
+    border: 1px solid #232a36 !important;
+    border-radius: 1.25rem !important;
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+    animation: fowModalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fowModalPop {
+    from {
+        opacity: 0;
+        transform: scale(0.93) translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+

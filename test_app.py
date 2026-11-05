@@ -1195,6 +1195,52 @@ class TestFilmsOverWeb(unittest.TestCase):
             db.commit()
         db.close()
 
+        # 17. WhatsApp / Social Crawler Open Graph Image Indexing and PIN Protection:
+        # Generate a share link with PIN
+        gen_resp6 = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        data6 = gen_resp6.json()
+        share_url6 = data6.get("share_url")
+        token6 = data6.get("share_token")
+        pin6 = data6.get("pin_code")
+
+        # Simulate WhatsApp bot/crawler scraping the URL for link preview
+        whatsapp_client = TestClient(app)
+        wa_headers = {
+            "User-Agent": "WhatsApp/2.21.12.21 i",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        }
+        wa_resp = whatsapp_client.get(share_url6, headers=wa_headers)
+        self.assertEqual(wa_resp.status_code, 200)
+
+        # Check Open Graph tags and image for WhatsApp indexing
+        self.assertIn(b'property="og:image"', wa_resp.content)
+        self.assertIn(b'property="og:title"', wa_resp.content)
+        self.assertIn(b'property="og:description"', wa_resp.content)
+        self.assertIn(b'property="og:type" content="video.movie"', wa_resp.content)
+        self.assertIn(b'name="twitter:image"', wa_resp.content)
+        self.assertIn(movie_title.encode("utf-8"), wa_resp.content)
+
+        # CRITICAL: Verify that the WhatsApp scraper did NOT consume or delete the PIN!
+        db = SessionLocal()
+        wa_pin_obj = db.query(MovieSharePin).filter(MovieSharePin.share_token == token6, MovieSharePin.pin_code == pin6).first()
+        self.assertIsNotNone(wa_pin_obj, "WhatsApp scraper must NOT consume or delete the PIN from the database")
+        db.close()
+
+        # Now real human recipient clicks the link in Chrome/Safari:
+        human_client = TestClient(app)
+        human_headers = {
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        }
+        human_resp = human_client.get(share_url6, headers=human_headers)
+        self.assertEqual(human_resp.status_code, 200)
+        self.assertIn(b"Unlocked", human_resp.content)
+
+        # The PIN is now consumed and deleted from the database!
+        db = SessionLocal()
+        deleted_wa_pin = db.query(MovieSharePin).filter(MovieSharePin.share_token == token6).first()
+        self.assertIsNone(deleted_wa_pin, "Human first click must consume and delete the PIN from the DB")
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

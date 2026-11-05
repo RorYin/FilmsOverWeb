@@ -14,7 +14,15 @@
     <script src="/static/js/lucide.min.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/style.css">
-    {% block head %}{% endblock %}
+    {% block head %}
+    <!-- Default Open Graph Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="FilmsOverWeb">
+    <meta property="og:title" content="FilmsOverWeb - Cloud Cinema OTT">
+    <meta property="og:description" content="Direct Google Drive Cloud Streamer with Lossless Playback">
+    <meta property="og:image" content="{{ (request.base_url | string).rstrip('/') }}/static/img/favicon.svg">
+    <meta name="twitter:card" content="summary_large_image">
+    {% endblock %}
 </head>
 <body class="bg-brand-dark text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-amber-500 selection:text-black">
 

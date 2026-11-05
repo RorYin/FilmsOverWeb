@@ -2,6 +2,37 @@
 
 {% block title %}{{ movie.title }} ({{ movie.year }}) - FilmsOverWeb{% endblock %}
 
+{% block head %}
+    {% if og_data %}
+    <!-- Primary Meta Tags for Social & WhatsApp Indexing -->
+    <meta name="title" content="{{ og_data.og_title }}">
+    <meta name="description" content="{{ og_data.og_description }}">
+
+    <!-- Open Graph / WhatsApp / Facebook / Telegram / LinkedIn -->
+    <meta property="og:type" content="video.movie">
+    <meta property="og:site_name" content="FilmsOverWeb">
+    <meta property="og:url" content="{{ og_data.og_url }}">
+    <meta property="og:title" content="{{ og_data.og_title }}">
+    <meta property="og:description" content="{{ og_data.og_description }}">
+    <meta property="og:image" content="{{ og_data.og_image }}">
+    <meta property="og:image:secure_url" content="{{ og_data.og_image }}">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="780">
+    <meta property="og:image:height" content="439">
+    <meta property="og:image:alt" content="{{ movie.title }}">
+
+    <!-- Legacy / Android link preview -->
+    <link rel="image_src" href="{{ og_data.og_image }}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="{{ og_data.og_url }}">
+    <meta name="twitter:title" content="{{ og_data.og_title }}">
+    <meta name="twitter:description" content="{{ og_data.og_description }}">
+    <meta name="twitter:image" content="{{ og_data.og_image }}">
+    {% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="relative pb-20">
 
@@ -331,8 +362,8 @@
 
 <!-- SuperAdmin Share Modal -->
 {% if user.role == 'superadmin' and not is_share_page %}
-<div id="superadmin-share-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-brand-surface border border-brand-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6 relative">
+<div id="superadmin-share-modal" class="fow-modal-overlay fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4" style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; background-color: rgba(0, 0, 0, 0.85) !important;">
+    <div class="fow-modal-card bg-brand-surface border border-brand-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6 relative m-auto" style="background-color: #12151c !important; border-color: #232a36 !important;">
         <button type="button" onclick="closeSuperAdminShareModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
             <i data-lucide="x" class="w-5 h-5"></i>
         </button>
@@ -369,6 +400,10 @@
                     <button type="button" onclick="copyShareLink()" class="bg-amber-500 hover:bg-amber-400 text-black px-4 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 transition cursor-pointer flex-none shadow-md shadow-amber-500/20">
                         <i data-lucide="copy" class="w-3.5 h-3.5"></i>
                         <span>Copy Link</span>
+                    </button>
+                    <button type="button" onclick="shareOnWhatsApp()" class="bg-[#25D366] hover:bg-[#20bd5a] text-black px-3.5 py-2.5 rounded-xl text-xs font-black flex items-center space-x-1.5 transition cursor-pointer flex-none shadow-md shadow-[#25D366]/20" title="Share directly on WhatsApp with movie poster preview">
+                        <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+                        <span>WhatsApp</span>
                     </button>
                 </div>
             </div>
@@ -413,8 +448,8 @@
 
 <!-- Viewer 4-Digit PIN Modal -->
 {% if is_share_page and not is_unlocked %}
-<div id="viewer-pin-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4">
-    <div class="bg-brand-surface border border-brand-border rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-6 relative text-center">
+<div id="viewer-pin-modal" class="fow-modal-overlay fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4" style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; background-color: rgba(0, 0, 0, 0.85) !important;">
+    <div class="fow-modal-card bg-brand-surface border border-brand-border rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-6 relative text-center m-auto" style="background-color: #12151c !important; border-color: #232a36 !important;">
         <button type="button" onclick="closePinModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white transition">
             <i data-lucide="x" class="w-5 h-5"></i>
         </button>
@@ -478,8 +513,11 @@
 
     async function openSuperAdminShareModal() {
         const modal = document.getElementById('superadmin-share-modal');
+        if (!modal) return;
         modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.classList.add('flex', 'active');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
 
         const loadingState = document.getElementById('share-modal-loading');
         const resultState = document.getElementById('share-modal-result');
@@ -525,7 +563,9 @@
         const modal = document.getElementById('superadmin-share-modal');
         if (modal) {
             modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            modal.classList.remove('flex', 'active');
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
         }
     }
 
@@ -539,6 +579,13 @@
         if (!currentShareData) return;
         navigator.clipboard.writeText(currentShareData.pin);
         showToast('PIN code copied to clipboard!');
+    }
+
+    function shareOnWhatsApp() {
+        if (!currentShareData) return;
+        const msg = `Watch "${currentShareData.movieTitle}" on FilmsOverWeb (Lossless Cloud Streaming):\n${currentShareData.url}`;
+        const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
     }
 
     function copyShareAll() {
@@ -555,7 +602,9 @@
         const modal = document.getElementById('viewer-pin-modal');
         if (!modal) return;
         modal.classList.remove('hidden');
-        modal.classList.add('flex');
+        modal.classList.add('flex', 'active');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
         const first = document.getElementById('pin-digit-0');
         if (first) {
             setTimeout(() => first.focus(), 150);
@@ -566,7 +615,9 @@
         const modal = document.getElementById('viewer-pin-modal');
         if (modal) {
             modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            modal.classList.remove('flex', 'active');
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
         }
     }
 
@@ -663,5 +714,32 @@
         }
     }
     {% endif %}
+
+    // Universal Modal Backdrop Click & Escape Key Handlers
+    document.addEventListener('click', function(e) {
+        const shareModal = document.getElementById('superadmin-share-modal');
+        if (shareModal && e.target === shareModal) {
+            if (typeof closeSuperAdminShareModal === 'function') {
+                closeSuperAdminShareModal();
+            }
+        }
+        const pinModal = document.getElementById('viewer-pin-modal');
+        if (pinModal && e.target === pinModal) {
+            if (typeof closePinModal === 'function') {
+                closePinModal();
+            }
+        }
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            if (typeof closeSuperAdminShareModal === 'function') {
+                closeSuperAdminShareModal();
+            }
+            if (typeof closePinModal === 'function') {
+                closePinModal();
+            }
+        }
+    });
 </script>
 {% endblock %}

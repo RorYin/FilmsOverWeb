@@ -84,6 +84,93 @@ def deduplicate_movies(movies_list):
                 seen[key] = m
     return list(seen.values())
 
+def is_crawler_or_bot(request: Request) -> bool:
+    """
+    Detects if the request is from a social media crawler/bot (WhatsApp,
+    Facebook, Twitter, Telegram, Discord, Slack, etc.) requesting link previews.
+    Crawlers scrape Open Graph metadata and must NOT consume or expire
+    single-use PIN codes.
+    """
+    ua = request.headers.get("user-agent", "").lower()
+    if not ua:
+        return False
+    crawler_keywords = (
+        "whatsapp",
+        "facebookexternalhit",
+        "facebot",
+        "twitterbot",
+        "telegrambot",
+        "slackbot",
+        "discordbot",
+        "linkedinbot",
+        "applebot",
+        "googlebot",
+        "bingbot",
+        "duckduckbot",
+        "skypeuripreview",
+        "vkshare",
+        "w3c_validator",
+        "meta-externalagent",
+        "embedly",
+        "quora link preview",
+        "pinterest",
+        "outbrain",
+        "yahoo! slurp",
+    )
+    return any(bot in ua for bot in crawler_keywords)
+
+def get_movie_og_data(movie: Movie, request: Request) -> dict:
+    """
+    Generates rich Open Graph and Twitter Card metadata for social media scrapers
+    (specifically tailored for WhatsApp, Telegram, and social sharing).
+    Ensures high-resolution, lightweight 16:9 images (<300KB) for instant preview cards.
+    """
+    base_url = str(request.base_url).rstrip("/")
+    # Force https if forwarded proto or request is https
+    if request.headers.get("x-forwarded-proto") == "https" and base_url.startswith("http://"):
+        base_url = "https://" + base_url[7:]
+
+    # Pick image: prefer backdrop (16:9) over poster for landscape social preview cards
+    image_url = movie.backdrop_path or movie.poster_path or ""
+    if image_url:
+        if "image.tmdb.org/t/p/original/" in image_url:
+            # WhatsApp prefers images under 300KB. w780 delivers a ~100KB sharp 16:9 JPEG
+            image_url = image_url.replace("/original/", "/w780/")
+        elif image_url.startswith("/"):
+            image_url = f"https://image.tmdb.org/t/p/w780{image_url}"
+        elif not image_url.startswith("http"):
+            image_url = f"{base_url}/{image_url.lstrip('/')}"
+    else:
+        image_url = f"{base_url}/static/img/poster-placeholder.png"
+
+    year_str = f" ({movie.year})" if movie.year else ""
+    title = f"{movie.title}{year_str}"
+
+    desc_parts = []
+    if movie.genres:
+        desc_parts.append(movie.genres)
+    if movie.resolution:
+        desc_parts.append(movie.resolution)
+    if movie.duration:
+        desc_parts.append(f"{movie.duration} min")
+    specs = " • ".join(desc_parts)
+
+    overview = (movie.overview or movie.tagline or "").strip()
+    if overview:
+        description = f"{specs} | {overview}" if specs else overview
+    else:
+        description = f"{specs} | Watch {title} on FilmsOverWeb with lossless Google Drive cloud cinema." if specs else f"Watch {title} on FilmsOverWeb with lossless Google Drive cloud cinema."
+
+    if len(description) > 250:
+        description = description[:247] + "..."
+
+    return {
+        "og_title": f"{title} - FilmsOverWeb",
+        "og_description": description,
+        "og_image": image_url,
+        "og_url": str(request.url),
+    }
+
 @router.get("/", response_class=HTMLResponse)
 async def home_library(
     request: Request,
@@ -274,6 +361,8 @@ async def movie_detail(
         ).all()
         related = deduplicate_movies(raw_related)[:6]
 
+    og_data = get_movie_og_data(movie, request)
+
     return templates.TemplateResponse(
         request=request,
         name="movie_detail.html",
@@ -282,7 +371,8 @@ async def movie_detail(
             "movie": movie,
             "progress": progress,
             "quality_versions": quality_versions,
-            "related_movies": related
+            "related_movies": related,
+            "og_data": og_data
         }
     )
 
@@ -528,6 +618,43 @@ async def view_shared_movie(
         )
 
     gdrive_id = movie.gdrive_file_id
+    og_data = get_movie_og_data(movie, request)
+
+    # Scrapers (WhatsApp, Facebook, Twitter, Telegram, Discord, etc.) visit links to fetch OpenGraph preview images.
+    # We MUST return the rich page with og_data, but NEVER consume or expire the single-use PIN!
+    if is_crawler_or_bot(request):
+        shared_user = User(
+            id=0,
+            name="Shared Guest",
+            email="shared_viewer@guest",
+            role="guest",
+            is_active=True,
+            must_change_password=False
+        )
+        setattr(shared_user, "is_shared", True)
+        setattr(shared_user, "shared_movie_id", movie.id)
+        setattr(shared_user, "shared_gdrive_file_id", movie.gdrive_file_id)
+        setattr(shared_user, "shared_file_name", movie.file_name)
+        setattr(shared_user, "movie_title", movie.title)
+        setattr(shared_user, "share_token", gdrive_id)
+
+        quality_versions = get_quality_versions(movie, db)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="movie_detail.html",
+            context={
+                "user": shared_user,
+                "movie": movie,
+                "progress": None,
+                "quality_versions": quality_versions,
+                "related_movies": [],
+                "is_share_page": True,
+                "is_unlocked": False,
+                "share_token": gdrive_id,
+                "og_data": og_data
+            }
+        )
 
     # 2. Check if this browser already has a valid 48-hour share cookie for THIS specific movie
     cookie_token = (
@@ -571,7 +698,8 @@ async def view_shared_movie(
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": True,
-                "share_token": gdrive_id
+                "share_token": gdrive_id,
+                "og_data": og_data
             }
         )
 
@@ -597,7 +725,7 @@ async def view_shared_movie(
         return templates.TemplateResponse(
             request=request,
             name="share_expired.html",
-            context={"request": request},
+            context={"request": request, "og_data": og_data},
             status_code=404
         )
 
@@ -607,7 +735,7 @@ async def view_shared_movie(
         return templates.TemplateResponse(
             request=request,
             name="share_expired.html",
-            context={"request": request},
+            context={"request": request, "og_data": og_data},
             status_code=410
         )
 
@@ -660,7 +788,8 @@ async def view_shared_movie(
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": True,
-                "share_token": gdrive_id
+                "share_token": gdrive_id,
+                "og_data": og_data
             }
         )
         resp.set_cookie(key=f"fow_share_{gdrive_id}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
@@ -696,7 +825,8 @@ async def view_shared_movie(
             "related_movies": [],
             "is_share_page": True,
             "is_unlocked": False,
-            "share_token": gdrive_id
+            "share_token": gdrive_id,
+            "og_data": og_data
         }
     )
 
