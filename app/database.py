@@ -1,6 +1,8 @@
+from __future__ import annotations
 import os
 import json
 import threading
+from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 from pathlib import Path
 from app.config import settings
