@@ -225,6 +225,8 @@ class JsonDatabase:
 
     def _fetch_from_cloud(self) -> Optional[dict]:
         """Fetches the latest database JSON from cloud storage (Upstash Redis or JSONBin) if configured."""
+        browser_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 FilmsOverWeb/1.0"
+
         upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
         upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
         if upstash_url and upstash_token:
@@ -232,7 +234,10 @@ class JsonDatabase:
                 import urllib.request
                 req = urllib.request.Request(
                     f"{upstash_url.rstrip('/')}/get/films_over_web_db",
-                    headers={"Authorization": f"Bearer {upstash_token}"}
+                    headers={
+                        "Authorization": f"Bearer {upstash_token}",
+                        "User-Agent": browser_ua
+                    }
                 )
                 with urllib.request.urlopen(req, timeout=5) as resp:
                     res = json.loads(resp.read().decode("utf-8"))
@@ -245,24 +250,37 @@ class JsonDatabase:
         jsonbin_id = os.getenv("JSONBIN_BIN_ID")
         jsonbin_key = os.getenv("JSONBIN_API_KEY")
         if jsonbin_id and jsonbin_key:
-            try:
-                import urllib.request
-                req = urllib.request.Request(
-                    f"https://api.jsonbin.io/v3/b/{jsonbin_id}/latest",
-                    headers={"X-Master-Key": jsonbin_key}
-                )
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    res = json.loads(resp.read().decode("utf-8"))
-                    record = res.get("record")
-                    if record and isinstance(record, dict):
-                        return record
-            except Exception as e:
-                print(f"[JSON_DB] Cloud fetch error from JSONBin: {e}")
+            # Try X-Master-Key first, then X-Access-Key
+            for key_header in ["X-Master-Key", "X-Access-Key"]:
+                try:
+                    import urllib.request
+                    req = urllib.request.Request(
+                        f"https://api.jsonbin.io/v3/b/{jsonbin_id}/latest",
+                        headers={
+                            key_header: jsonbin_key,
+                            "User-Agent": browser_ua
+                        }
+                    )
+                    with urllib.request.urlopen(req, timeout=5) as resp:
+                        res = json.loads(resp.read().decode("utf-8"))
+                        record = res.get("record")
+                        if record and isinstance(record, dict):
+                            print(f"[JSON_DB] Successfully loaded database from JSONBin using {key_header}!")
+                            return record
+                except urllib.error.HTTPError as e:
+                    if e.code == 401 and key_header == "X-Master-Key":
+                        continue
+                    err_msg = e.read().decode("utf-8", errors="ignore")
+                    print(f"[JSON_DB] Cloud fetch error from JSONBin ({key_header}): HTTP {e.code} {err_msg}")
+                except Exception as e:
+                    print(f"[JSON_DB] Cloud fetch error from JSONBin: {e}")
 
         return None
 
     def _sync_to_cloud(self, data: dict):
         """Asynchronously syncs database JSON to cloud storage (Upstash Redis or JSONBin)."""
+        browser_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 FilmsOverWeb/1.0"
+
         upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
         upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
         jsonbin_id = os.getenv("JSONBIN_BIN_ID")
@@ -279,7 +297,11 @@ class JsonDatabase:
                     req = urllib.request.Request(
                         upstash_url.rstrip("/"),
                         data=body,
-                        headers={"Authorization": f"Bearer {upstash_token}", "Content-Type": "application/json"},
+                        headers={
+                            "Authorization": f"Bearer {upstash_token}",
+                            "Content-Type": "application/json",
+                            "User-Agent": browser_ua
+                        },
                         method="POST"
                     )
                     with urllib.request.urlopen(req, timeout=5):
@@ -288,19 +310,31 @@ class JsonDatabase:
                     print(f"[JSON_DB] Cloud sync error to Upstash: {e}")
 
             if jsonbin_id and jsonbin_key:
-                try:
-                    import urllib.request
-                    body = json.dumps(data).encode("utf-8")
-                    req = urllib.request.Request(
-                        f"https://api.jsonbin.io/v3/b/{jsonbin_id}",
-                        data=body,
-                        headers={"X-Master-Key": jsonbin_key, "Content-Type": "application/json"},
-                        method="PUT"
-                    )
-                    with urllib.request.urlopen(req, timeout=5):
-                        pass
-                except Exception as e:
-                    print(f"[JSON_DB] Cloud sync error to JSONBin: {e}")
+                for key_header in ["X-Master-Key", "X-Access-Key"]:
+                    try:
+                        import urllib.request
+                        body = json.dumps(data).encode("utf-8")
+                        req = urllib.request.Request(
+                            f"https://api.jsonbin.io/v3/b/{jsonbin_id}",
+                            data=body,
+                            headers={
+                                key_header: jsonbin_key,
+                                "Content-Type": "application/json",
+                                "User-Agent": browser_ua
+                            },
+                            method="PUT"
+                        )
+                        with urllib.request.urlopen(req, timeout=5):
+                            return
+                    except urllib.error.HTTPError as e:
+                        if e.code == 401 and key_header == "X-Master-Key":
+                            continue
+                        err_msg = e.read().decode("utf-8", errors="ignore")
+                        print(f"[JSON_DB] Cloud sync error to JSONBin ({key_header}): HTTP {e.code} {err_msg}")
+                        break
+                    except Exception as e:
+                        print(f"[JSON_DB] Cloud sync error to JSONBin: {e}")
+                        break
 
         threading.Thread(target=_push, daemon=True).start()
 
