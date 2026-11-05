@@ -209,30 +209,137 @@ class JsonDatabase:
         }
         self.load()
 
+    def _seed_persistent_disk_if_needed(self):
+        if not os.path.exists(self.filepath):
+            base_seed = getattr(settings, "BASE_DIR", Path(".")) / "films_over_web.json"
+            if os.path.exists(base_seed) and os.path.abspath(self.filepath) != os.path.abspath(base_seed):
+                try:
+                    import shutil
+                    os.makedirs(os.path.dirname(os.path.abspath(self.filepath)), exist_ok=True)
+                    shutil.copyfile(base_seed, self.filepath)
+                    print(f"[JSON_DB] Seeded persistent database to {self.filepath}")
+                except Exception as e:
+                    print(f"[JSON_DB] Warning seeding persistent database: {e}")
+
+    def _fetch_from_cloud(self) -> Optional[dict]:
+        """Fetches the latest database JSON from cloud storage (Upstash Redis or JSONBin) if configured."""
+        upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
+        upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+        if upstash_url and upstash_token:
+            try:
+                import urllib.request
+                req = urllib.request.Request(
+                    f"{upstash_url.rstrip('/')}/get/films_over_web_db",
+                    headers={"Authorization": f"Bearer {upstash_token}"}
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    val = res.get("result")
+                    if val:
+                        return json.loads(val) if isinstance(val, str) else val
+            except Exception as e:
+                print(f"[JSON_DB] Cloud fetch error from Upstash: {e}")
+
+        jsonbin_id = os.getenv("JSONBIN_BIN_ID")
+        jsonbin_key = os.getenv("JSONBIN_API_KEY")
+        if jsonbin_id and jsonbin_key:
+            try:
+                import urllib.request
+                req = urllib.request.Request(
+                    f"https://api.jsonbin.io/v3/b/{jsonbin_id}/latest",
+                    headers={"X-Master-Key": jsonbin_key}
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    record = res.get("record")
+                    if record and isinstance(record, dict):
+                        return record
+            except Exception as e:
+                print(f"[JSON_DB] Cloud fetch error from JSONBin: {e}")
+
+        return None
+
+    def _sync_to_cloud(self, data: dict):
+        """Asynchronously syncs database JSON to cloud storage (Upstash Redis or JSONBin)."""
+        upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
+        upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+        jsonbin_id = os.getenv("JSONBIN_BIN_ID")
+        jsonbin_key = os.getenv("JSONBIN_API_KEY")
+
+        if not ((upstash_url and upstash_token) or (jsonbin_id and jsonbin_key)):
+            return
+
+        def _push():
+            if upstash_url and upstash_token:
+                try:
+                    import urllib.request
+                    body = json.dumps(["SET", "films_over_web_db", json.dumps(data)]).encode("utf-8")
+                    req = urllib.request.Request(
+                        upstash_url.rstrip("/"),
+                        data=body,
+                        headers={"Authorization": f"Bearer {upstash_token}", "Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=5):
+                        pass
+                except Exception as e:
+                    print(f"[JSON_DB] Cloud sync error to Upstash: {e}")
+
+            if jsonbin_id and jsonbin_key:
+                try:
+                    import urllib.request
+                    body = json.dumps(data).encode("utf-8")
+                    req = urllib.request.Request(
+                        f"https://api.jsonbin.io/v3/b/{jsonbin_id}",
+                        data=body,
+                        headers={"X-Master-Key": jsonbin_key, "Content-Type": "application/json"},
+                        method="PUT"
+                    )
+                    with urllib.request.urlopen(req, timeout=5):
+                        pass
+                except Exception as e:
+                    print(f"[JSON_DB] Cloud sync error to JSONBin: {e}")
+
+        threading.Thread(target=_push, daemon=True).start()
+
     def load(self):
         with self.lock:
-            if not os.path.exists(self.filepath):
-                # If sqlite exists, auto-migrate!
-                sqlite_path = getattr(settings, "BASE_DIR", Path(".")) / "films_over_web.db"
-                if os.path.exists(sqlite_path):
-                    self._migrate_from_sqlite(sqlite_path)
-                return
+            self._seed_persistent_disk_if_needed()
 
-            try:
-                mtime = os.path.getmtime(self.filepath)
-                self._last_mtime = mtime
-                with open(self.filepath, "r", encoding="utf-8") as f:
-                    raw_data = json.load(f)
-                for table_name, rows in raw_data.items():
-                    model_cls = _REGISTERED_MODELS.get(table_name)
-                    if model_cls:
-                        self.collections[table_name] = [
-                            model_cls.from_dict(r) if isinstance(r, dict) else r for r in rows
-                        ]
-                    else:
-                        self.collections[table_name] = list(rows)
-            except Exception as e:
-                print(f"[JSON_DB] Warning: failed to parse {self.filepath}: {e}")
+            raw_data = None
+            cloud_data = self._fetch_from_cloud()
+            if cloud_data:
+                raw_data = cloud_data
+                try:
+                    with open(self.filepath, "w", encoding="utf-8") as f:
+                        json.dump(cloud_data, f, indent=2, default=str)
+                except Exception:
+                    pass
+
+            if not raw_data:
+                if not os.path.exists(self.filepath):
+                    sqlite_path = getattr(settings, "BASE_DIR", Path(".")) / "films_over_web.db"
+                    if os.path.exists(sqlite_path):
+                        self._migrate_from_sqlite(sqlite_path)
+                    return
+
+                try:
+                    mtime = os.path.getmtime(self.filepath)
+                    self._last_mtime = mtime
+                    with open(self.filepath, "r", encoding="utf-8") as f:
+                        raw_data = json.load(f)
+                except Exception as e:
+                    print(f"[JSON_DB] Warning: failed to parse {self.filepath}: {e}")
+                    return
+
+            for table_name, rows in raw_data.items():
+                model_cls = _REGISTERED_MODELS.get(table_name)
+                if model_cls:
+                    self.collections[table_name] = [
+                        model_cls.from_dict(r) if isinstance(r, dict) else r for r in rows
+                    ]
+                else:
+                    self.collections[table_name] = list(rows)
 
     def _migrate_from_sqlite(self, sqlite_path):
         try:
@@ -290,6 +397,8 @@ class JsonDatabase:
                 self._last_mtime = os.path.getmtime(self.filepath)
             except Exception:
                 pass
+
+            self._sync_to_cloud(data)
 
     def get_collection(self, model_cls):
         with self.lock:
