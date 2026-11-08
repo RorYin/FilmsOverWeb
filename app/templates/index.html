@@ -71,7 +71,7 @@
 
                     <!-- Action Buttons -->
                     <div class="flex items-center space-x-4 pt-2">
-                        <a href="/watch/{{ movie.id }}" class="hero-btn hero-watch-btn bg-brand-red hover:bg-brand-redHover text-black px-6 py-3 rounded-xl font-black text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105" tabindex="{% if loop.first %}0{% else %}-1{% endif %}">
+                        <a href="/watch/{{ movie.default_playable_id or movie.id }}" class="hero-btn hero-watch-btn bg-brand-red hover:bg-brand-redHover text-black px-6 py-3 rounded-xl font-black text-sm flex items-center space-x-2 shadow-lg shadow-brand-red/30 transition transform hover:scale-105" tabindex="{% if loop.first %}0{% else %}-1{% endif %}">
                             <i data-lucide="play" class="w-5 h-5 fill-current"></i>
                             <span>Watch Now</span>
                         </a>

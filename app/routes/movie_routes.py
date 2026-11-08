@@ -209,7 +209,7 @@ async def home_library(
                 "movie": cw.movie,
                 "title": cw.movie.title,
                 "subtitle": f"{cw.movie.year}" if cw.movie.year else "",
-                "watch_url": f"/watch/{cw.movie.id}",
+                "watch_url": f"/watch/{cw.movie.id}?select=explicit",
                 "poster_path": cw.movie.poster_path,
                 "progress_percent": min(percent, 100),
                 "position_seconds": cw.position_seconds
@@ -227,6 +227,9 @@ async def home_library(
     hero_movies = [m for m in all_recent if (m.backdrop_path or m.poster_path)][:10]
     if not hero_movies and all_recent:
         hero_movies = all_recent[:10]
+    for m in hero_movies:
+        q_vers = get_quality_versions(m, db)
+        setattr(m, "default_playable_id", q_vers[-1]["id"] if q_vers else m.id)
     hero_movie = hero_movies[0] if hero_movies else None
 
     return templates.TemplateResponse(
@@ -350,6 +353,7 @@ async def movie_detail(
 
     # Available quality versions in Google Drive
     quality_versions = get_quality_versions(movie, db)
+    default_playable = quality_versions[-1] if quality_versions else None
 
     # Related movies (same genre)
     related = []
@@ -371,6 +375,7 @@ async def movie_detail(
             "movie": movie,
             "progress": progress,
             "quality_versions": quality_versions,
+            "default_playable": default_playable,
             "related_movies": related,
             "og_data": og_data
         }
@@ -416,6 +421,21 @@ async def watch_player(
                 return RedirectResponse(url=f"/watch/{real_movie.gdrive_file_id}", status_code=302)
             raise HTTPException(status_code=403, detail="Shared access denied for this movie")
 
+    # All available quality/resolution versions of this movie in Google Drive
+    quality_versions = get_quality_versions(movie, db)
+
+    # When a movie has multiple sources, default to the lowest size/resolution source
+    # unless a specific source was explicitly selected (via ?select=explicit) or it's a shared guest pass
+    select_param = request.query_params.get("select")
+    if not select_param and not getattr(user, "is_shared", False) and quality_versions and len(quality_versions) > 1:
+        lowest_version = quality_versions[-1]
+        if lowest_version["id"] != movie.id:
+            lowest_movie = db.query(Movie).filter(Movie.id == lowest_version["id"]).first()
+            if lowest_movie:
+                movie = lowest_movie
+                for q in quality_versions:
+                    q["is_active"] = (q["id"] == movie.id)
+
     progress = db.query(WatchProgress).filter(
         WatchProgress.user_id == user.id,
         WatchProgress.movie_id == movie.id
@@ -443,9 +463,6 @@ async def watch_player(
     is_mkv = movie.file_name.lower().endswith(".mkv")
     has_multichannel_audio = any(x in filename_upper for x in ["DD+", "DDP", "DTS", "TRUEHD", "ATMOS", "AC3", "EAC3"])
     needs_transmux = is_mkv or has_multichannel_audio
-
-    # All available quality/resolution versions of this movie in Google Drive
-    quality_versions = get_quality_versions(movie, db)
 
     from app.models import SystemSetting
     from app.config import settings
@@ -639,6 +656,7 @@ async def view_shared_movie(
         setattr(shared_user, "share_token", gdrive_id)
 
         quality_versions = get_quality_versions(movie, db)
+        default_playable = quality_versions[-1] if quality_versions else None
 
         return templates.TemplateResponse(
             request=request,
@@ -648,6 +666,7 @@ async def view_shared_movie(
                 "movie": movie,
                 "progress": None,
                 "quality_versions": quality_versions,
+                "default_playable": default_playable,
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": False,
@@ -686,6 +705,7 @@ async def view_shared_movie(
         setattr(shared_user, "share_token", gdrive_id)
 
         quality_versions = get_quality_versions(movie, db)
+        default_playable = quality_versions[-1] if quality_versions else None
 
         return templates.TemplateResponse(
             request=request,
@@ -695,6 +715,7 @@ async def view_shared_movie(
                 "movie": movie,
                 "progress": None,
                 "quality_versions": quality_versions,
+                "default_playable": default_playable,
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": True,
@@ -776,6 +797,7 @@ async def view_shared_movie(
         setattr(shared_user, "share_token", gdrive_id)
 
         quality_versions = get_quality_versions(movie, db)
+        default_playable = quality_versions[-1] if quality_versions else None
 
         resp = templates.TemplateResponse(
             request=request,
@@ -785,6 +807,7 @@ async def view_shared_movie(
                 "movie": movie,
                 "progress": None,
                 "quality_versions": quality_versions,
+                "default_playable": default_playable,
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": True,
@@ -813,6 +836,7 @@ async def view_shared_movie(
     setattr(shared_user, "share_token", gdrive_id)
 
     quality_versions = get_quality_versions(movie, db)
+    default_playable = quality_versions[-1] if quality_versions else None
 
     return templates.TemplateResponse(
         request=request,
@@ -822,6 +846,7 @@ async def view_shared_movie(
             "movie": movie,
             "progress": None,
             "quality_versions": quality_versions,
+            "default_playable": default_playable,
             "related_movies": [],
             "is_share_page": True,
             "is_unlocked": False,

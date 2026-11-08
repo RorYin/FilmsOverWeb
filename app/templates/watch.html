@@ -272,7 +272,7 @@
             currentMovieId = targetId;
 
             // Update browser URL without reloading page
-            window.history.replaceState(null, '', `/watch/${targetId}`);
+            window.history.replaceState(null, '', `/watch/${targetId}?select=explicit`);
 
             moviPlayer.setAttribute('src', buildStreamUrl(currentGdriveId, currentFileName));
             moviPlayer.addEventListener('loadedmetadata', () => {

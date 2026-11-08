@@ -1241,6 +1241,89 @@ class TestFilmsOverWeb(unittest.TestCase):
         self.assertIsNone(deleted_wa_pin, "Human first click must consume and delete the PIN from the DB")
         db.close()
 
+    def test_20_default_playable_lowest_source(self):
+        """
+        Verify that when a movie has multiple quality sources in Google Drive:
+        1. By default hitting play selects the lowest resolution/size source.
+        2. Explicitly selecting another quality (e.g. 4K) plays that selected quality.
+        """
+        db = SessionLocal()
+        # Clean up any existing test movies with this tmdb_id
+        for m in db.query(Movie).filter(Movie.tmdb_id == 888777).all():
+            db.delete(m)
+        db.commit()
+
+        # Create 3 quality versions of the same movie
+        m_4k = Movie(
+            title="Multi Source Test Film",
+            year=2024,
+            tmdb_id=888777,
+            resolution="4K UHD",
+            file_size=15 * 1024 * 1024 * 1024,
+            gdrive_file_id="gdrive_4k_test_fid",
+            file_name="Multi.Source.Test.Film.2024.2160p.4K.mkv",
+            codec="HEVC"
+        )
+        m_1080 = Movie(
+            title="Multi Source Test Film",
+            year=2024,
+            tmdb_id=888777,
+            resolution="1080p",
+            file_size=4 * 1024 * 1024 * 1024,
+            gdrive_file_id="gdrive_1080p_test_fid",
+            file_name="Multi.Source.Test.Film.2024.1080p.mkv",
+            codec="HEVC"
+        )
+        m_720 = Movie(
+            title="Multi Source Test Film",
+            year=2024,
+            tmdb_id=888777,
+            resolution="720p",
+            file_size=1 * 1024 * 1024 * 1024,
+            gdrive_file_id="gdrive_720p_test_fid",
+            file_name="Multi.Source.Test.Film.2024.720p.mkv",
+            codec="H.264"
+        )
+        db.add_all([m_4k, m_1080, m_720])
+        db.commit()
+        db.refresh(m_4k)
+        db.refresh(m_1080)
+        db.refresh(m_720)
+        m_4k_id = m_4k.id
+        m_720_id = m_720.id
+        db.close()
+
+        # Log in as admin
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={"email": "test@gmail.com", "password": "1q2w3e4r5t", "next": "/"})
+
+        # 1. Check movie details page
+        detail_resp = admin_client.get(f"/movie/{m_4k_id}")
+        self.assertEqual(detail_resp.status_code, 200)
+
+        # Primary play button should point to lowest resolution source (720p)
+        self.assertIn(f'/watch/{m_720_id}'.encode(), detail_resp.content)
+
+        # Available qualities list should offer explicit selection links
+        self.assertIn(f'/watch/{m_4k_id}?select=explicit'.encode(), detail_resp.content)
+
+        # 2. Hitting /watch/{m_4k_id} WITHOUT ?select=explicit should default to the lowest source (720p)
+        watch_default = admin_client.get(f"/watch/{m_4k_id}")
+        self.assertEqual(watch_default.status_code, 200)
+        self.assertIn(b"gdrive_720p_test_fid", watch_default.content)
+
+        # 3. Hitting /watch/{m_4k_id} WITH ?select=explicit should play the selected 4K source
+        watch_explicit = admin_client.get(f"/watch/{m_4k_id}?select=explicit")
+        self.assertEqual(watch_explicit.status_code, 200)
+        self.assertIn(b"gdrive_4k_test_fid", watch_explicit.content)
+
+        # Clean up
+        db = SessionLocal()
+        for m in db.query(Movie).filter(Movie.tmdb_id == 888777).all():
+            db.delete(m)
+        db.commit()
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 
