@@ -54,7 +54,7 @@ def get_token_from_request(request: Request) -> Optional[str]:
     # Check specific cookie if path is movie-specific
     path_parts = request.url.path.strip("/").split("/")
     if len(path_parts) >= 2 and path_parts[0] in ["watch", "stream", "movie", "api", "share"]:
-        target = path_parts[1].split(".")[0]
+        target = path_parts[2].split(".")[0] if (path_parts[0] == "api" and len(path_parts) >= 3) else path_parts[1].split(".")[0]
         # 1. Exact cookie for this target (gdrive_file_id or id)
         direct_cookie = request.cookies.get(f"fow_share_{target}")
         if direct_cookie:
@@ -137,8 +137,13 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
             allowed = True
         elif path.startswith("/movie/") or path.startswith("/watch/") or path.startswith("/stream/") or path.startswith("/api/movies/"):
             path_parts = path.strip("/").split("/")
-            if len(path_parts) >= 2:
+            target_ident = None
+            if path.startswith("/api/movies/") and len(path_parts) >= 3:
+                target_ident = path_parts[2].split(".")[0]
+            elif len(path_parts) >= 2:
                 target_ident = path_parts[1].split(".")[0]
+
+            if target_ident:
                 shared_gid = getattr(user, "shared_gdrive_file_id", None)
                 shared_fname = getattr(user, "shared_file_name", None)
                 shared_mid = getattr(user, "shared_movie_id", None)
@@ -161,6 +166,20 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
                             allowed = True
                         elif shared_fname and target_m.file_name == shared_fname:
                             allowed = True
+                        else:
+                            # Allow if target_m is any quality version of the authorized shared movie
+                            shared_m = None
+                            if shared_gid:
+                                shared_m = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+                            if not shared_m and shared_mid is not None:
+                                shared_m = db.query(Movie).filter(Movie.id == int(shared_mid)).first()
+                            if shared_m:
+                                if shared_m.tmdb_id and target_m.tmdb_id and shared_m.tmdb_id == target_m.tmdb_id:
+                                    allowed = True
+                                elif (shared_m.title and target_m.title and
+                                      shared_m.title.strip().lower() == target_m.title.strip().lower() and
+                                      shared_m.year == target_m.year):
+                                    allowed = True
 
         if not allowed:
             accept = request.headers.get("accept", "")

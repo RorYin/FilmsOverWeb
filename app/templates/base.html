@@ -32,7 +32,7 @@
             <div class="flex items-center justify-between h-16">
                 <!-- Brand / Logo -->
                 <div class="flex items-center space-x-8">
-                    <a href="{% if user and user.is_shared %}/movie/{{ user.shared_movie_id }}{% else %}/{% endif %}" class="flex items-center space-x-2 text-2xl font-black tracking-wider group">
+                    <a href="{% if user and user.is_shared %}/share/{{ user.share_token or user.shared_gdrive_file_id }}{% else %}/{% endif %}" class="flex items-center space-x-2 text-2xl font-black tracking-wider group">
                         <span class="p-1.5 bg-brand-red rounded-lg group-hover:scale-105 transition-transform duration-200">
                             <i data-lucide="clapperboard" class="w-6 h-6 text-black"></i>
                         </span>

@@ -19,7 +19,7 @@
         <!-- Clean Cinema Navigation -->
         <div class="relative z-30 flex items-center justify-between bg-brand-surface/80 border border-brand-border px-4 py-3 rounded-2xl backdrop-blur shadow-md">
             <div class="flex items-center space-x-3">
-                <a href="/movie/{{ movie.id }}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl transition" title="Back to Movie Details">
+                <a href="{% if is_shared %}/share/{{ share_token }}{% else %}/movie/{{ movie.id }}{% endif %}" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2 rounded-xl transition" title="{% if is_shared %}Back to Shared Movie{% else %}Back to Movie Details{% endif %}">
                     <i data-lucide="arrow-left" class="w-5 h-5"></i>
                 </a>
                 <div>
@@ -99,8 +99,8 @@
                     <button id="btn-retry-stream" type="button" class="px-4 py-2 bg-brand-red hover:bg-brand-redHover text-black text-xs font-bold rounded-xl transition cursor-pointer">
                         Retry Playback
                     </button>
-                    <a href="/movies" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
-                        Back to Movies
+                    <a href="{% if is_shared %}/share/{{ share_token }}{% else %}/movies{% endif %}" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
+                        {% if is_shared %}Back to Movie{% else %}Back to Movies{% endif %}
                     </a>
                 </div>
             </div>

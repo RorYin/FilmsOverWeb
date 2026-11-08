@@ -306,6 +306,42 @@ async def browse_movies(
         }
     )
 
+def is_movie_authorized_for_shared_user(movie: Movie, user: User, db: Session) -> bool:
+    """
+    Checks if the requested movie belongs to the movie authorized by the shared 48-hour guest pass.
+    Allows exact file match, or any other quality version of the same movie (matched by tmdb_id or title+year).
+    """
+    if not getattr(user, "is_shared", False):
+        return True
+    shared_gid = getattr(user, "shared_gdrive_file_id", None)
+    shared_mid = getattr(user, "shared_movie_id", None)
+    shared_fname = getattr(user, "shared_file_name", None)
+
+    # 1. Direct match
+    if shared_gid and movie.gdrive_file_id == shared_gid:
+        return True
+    if shared_mid is not None and str(movie.id) == str(shared_mid):
+        return True
+    if shared_fname and movie.file_name == shared_fname:
+        return True
+
+    # 2. Match against shared movie's other quality versions
+    shared_movie = None
+    if shared_gid:
+        shared_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
+    if not shared_movie and shared_mid is not None:
+        shared_movie = db.query(Movie).filter(Movie.id == int(shared_mid)).first()
+
+    if shared_movie:
+        if shared_movie.tmdb_id and movie.tmdb_id and shared_movie.tmdb_id == movie.tmdb_id:
+            return True
+        if (shared_movie.title and movie.title and
+            shared_movie.title.strip().lower() == movie.title.strip().lower() and
+            shared_movie.year == movie.year):
+            return True
+
+    return False
+
 @router.get("/movie/{movie_id}", response_class=HTMLResponse)
 async def movie_detail(
     movie_id: str,
@@ -313,37 +349,19 @@ async def movie_detail(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
+    if getattr(user, "is_shared", False):
+        # A shared guest pass is strictly for the restricted /share/{token} page,
+        # never the full internal webapp page where navbar links would prompt login!
+        token = getattr(user, "share_token", None) or getattr(user, "shared_gdrive_file_id", None)
+        if token:
+            return RedirectResponse(url=f"/share/{token}", status_code=302)
+
     movie = db.query(Movie).filter(Movie.gdrive_file_id == movie_id).first()
     if not movie and str(movie_id).isdigit():
         movie = db.query(Movie).filter(Movie.id == int(movie_id)).first()
 
     if not movie:
-        if getattr(user, "is_shared", False):
-            shared_gid = getattr(user, "shared_gdrive_file_id", None)
-            if shared_gid:
-                real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
-                if real_movie:
-                    return RedirectResponse(url=f"/movie/{real_movie.gdrive_file_id}", status_code=302)
-
-            return templates.TemplateResponse(
-                request=request,
-                name="share_source_missing.html",
-                context={
-                    "request": request,
-                    "movie_title": getattr(user, "movie_title", ""),
-                    "file_name": getattr(user, "shared_file_name", "")
-                },
-                status_code=404
-            )
         raise HTTPException(status_code=404, detail="Movie not found")
-
-    if getattr(user, "is_shared", False):
-        shared_gid = getattr(user, "shared_gdrive_file_id", None)
-        if shared_gid and movie.gdrive_file_id != shared_gid:
-            real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
-            if real_movie and str(getattr(user, "shared_movie_id", "")) == str(movie_id):
-                return RedirectResponse(url=f"/movie/{real_movie.gdrive_file_id}", status_code=302)
-            raise HTTPException(status_code=403, detail="Shared access denied for this movie")
 
     # Check user watch progress
     progress = db.query(WatchProgress).filter(
@@ -354,6 +372,7 @@ async def movie_detail(
     # Available quality versions in Google Drive
     quality_versions = get_quality_versions(movie, db)
     default_playable = quality_versions[-1] if quality_versions else None
+    default_playable_target = str(default_playable["id"]) if default_playable else str(movie.id)
 
     # Related movies (same genre)
     related = []
@@ -376,6 +395,7 @@ async def movie_detail(
             "progress": progress,
             "quality_versions": quality_versions,
             "default_playable": default_playable,
+            "default_playable_target": default_playable_target,
             "related_movies": related,
             "og_data": og_data
         }
@@ -412,22 +432,18 @@ async def watch_player(
             )
         raise HTTPException(status_code=404, detail="Movie not found")
 
-    # If user is shared, ensure this movie actually matches their authorized Google Drive file
+    # If user is shared, ensure this movie actually belongs to their authorized shared movie
     if getattr(user, "is_shared", False):
-        shared_gid = getattr(user, "shared_gdrive_file_id", None)
-        if shared_gid and movie.gdrive_file_id != shared_gid:
-            real_movie = db.query(Movie).filter(Movie.gdrive_file_id == shared_gid).first()
-            if real_movie and str(getattr(user, "shared_movie_id", "")) == str(movie_id):
-                return RedirectResponse(url=f"/watch/{real_movie.gdrive_file_id}", status_code=302)
+        if not is_movie_authorized_for_shared_user(movie, user, db):
             raise HTTPException(status_code=403, detail="Shared access denied for this movie")
 
     # All available quality/resolution versions of this movie in Google Drive
     quality_versions = get_quality_versions(movie, db)
 
     # When a movie has multiple sources, default to the lowest size/resolution source
-    # unless a specific source was explicitly selected (via ?select=explicit) or it's a shared guest pass
+    # unless a specific source was explicitly selected (via ?select=explicit)
     select_param = request.query_params.get("select")
-    if not select_param and not getattr(user, "is_shared", False) and quality_versions and len(quality_versions) > 1:
+    if not select_param and quality_versions and len(quality_versions) > 1:
         lowest_version = quality_versions[-1]
         if lowest_version["id"] != movie.id:
             lowest_movie = db.query(Movie).filter(Movie.id == lowest_version["id"]).first()
@@ -475,7 +491,10 @@ async def watch_player(
     from app.gdrive import get_gdrive_access_token
     gdrive_access_token = get_gdrive_access_token(db)
 
-    return templates.TemplateResponse(
+    is_shared = getattr(user, "is_shared", False)
+    share_token = getattr(user, "share_token", "") or getattr(user, "shared_gdrive_file_id", "") or movie.gdrive_file_id
+
+    resp = templates.TemplateResponse(
         request=request,
         name="watch.html",
         context={
@@ -487,9 +506,16 @@ async def watch_player(
             "quality_versions": quality_versions,
             "cloudflare_worker_url": cloudflare_worker_url,
             "google_api_key": google_api_key,
-            "gdrive_access_token": gdrive_access_token or ""
+            "gdrive_access_token": gdrive_access_token or "",
+            "is_shared": is_shared,
+            "share_token": share_token
         }
     )
+    if is_shared:
+        max_age_48h = 48 * 3600
+        resp.set_cookie(key=f"fow_share_{movie.gdrive_file_id}", value=user_token, max_age=max_age_48h, httponly=True, samesite="lax")
+        resp.set_cookie(key="fow_share_token", value=user_token, max_age=max_age_48h, httponly=True, samesite="lax")
+    return resp
 
 
 # --- SuperAdmin Movie Share & 4-Digit PIN Access ---
@@ -657,6 +683,7 @@ async def view_shared_movie(
 
         quality_versions = get_quality_versions(movie, db)
         default_playable = quality_versions[-1] if quality_versions else None
+        default_playable_target = default_playable["gdrive_file_id"] if default_playable else movie.gdrive_file_id
 
         return templates.TemplateResponse(
             request=request,
@@ -667,6 +694,7 @@ async def view_shared_movie(
                 "progress": None,
                 "quality_versions": quality_versions,
                 "default_playable": default_playable,
+                "default_playable_target": default_playable_target,
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": False,
@@ -706,6 +734,7 @@ async def view_shared_movie(
 
         quality_versions = get_quality_versions(movie, db)
         default_playable = quality_versions[-1] if quality_versions else None
+        default_playable_target = default_playable["gdrive_file_id"] if default_playable else movie.gdrive_file_id
 
         return templates.TemplateResponse(
             request=request,
@@ -716,6 +745,7 @@ async def view_shared_movie(
                 "progress": None,
                 "quality_versions": quality_versions,
                 "default_playable": default_playable,
+                "default_playable_target": default_playable_target,
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": True,
@@ -798,6 +828,7 @@ async def view_shared_movie(
 
         quality_versions = get_quality_versions(movie, db)
         default_playable = quality_versions[-1] if quality_versions else None
+        default_playable_target = default_playable["gdrive_file_id"] if default_playable else movie.gdrive_file_id
 
         resp = templates.TemplateResponse(
             request=request,
@@ -808,6 +839,7 @@ async def view_shared_movie(
                 "progress": None,
                 "quality_versions": quality_versions,
                 "default_playable": default_playable,
+                "default_playable_target": default_playable_target,
                 "related_movies": [],
                 "is_share_page": True,
                 "is_unlocked": True,
@@ -817,6 +849,9 @@ async def view_shared_movie(
         )
         resp.set_cookie(key=f"fow_share_{gdrive_id}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
         resp.set_cookie(key=f"fow_share_movie_{movie_id}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
+        if default_playable_target:
+            resp.set_cookie(key=f"fow_share_{default_playable_target}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
+        resp.set_cookie(key="fow_share_token", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
         return resp
 
     # 5. PIN not in URL (or incorrect): Render locked details page where user can enter PIN manually
@@ -837,6 +872,7 @@ async def view_shared_movie(
 
     quality_versions = get_quality_versions(movie, db)
     default_playable = quality_versions[-1] if quality_versions else None
+    default_playable_target = default_playable["gdrive_file_id"] if default_playable else movie.gdrive_file_id
 
     return templates.TemplateResponse(
         request=request,
@@ -847,6 +883,7 @@ async def view_shared_movie(
             "progress": None,
             "quality_versions": quality_versions,
             "default_playable": default_playable,
+            "default_playable_target": default_playable_target,
             "related_movies": [],
             "is_share_page": True,
             "is_unlocked": False,
@@ -934,6 +971,12 @@ async def verify_share_pin(
     db.delete(share)
     db.commit()
 
+    # Determine lowest size/resolution version if multiple sources exist
+    quality_versions = get_quality_versions(movie, db)
+    lowest_version = quality_versions[-1] if quality_versions else None
+    playable_gid = lowest_version["gdrive_file_id"] if lowest_version else movie.gdrive_file_id
+    playable_id = lowest_version["id"] if lowest_version else movie_id
+
     # Create 48-hour browser access token
     share_payload = {
         "sub": f"shared_viewer_{gdrive_id[:10]}",
@@ -952,12 +995,15 @@ async def verify_share_pin(
         "success": True,
         "message": "PIN verified successfully! 48-hour access enabled on this browser.",
         "token": access_token,
-        "movie_id": movie_id,
-        "gdrive_file_id": movie.gdrive_file_id,
-        "watch_url": f"/watch/{movie.gdrive_file_id}?share_token={access_token}"
+        "movie_id": playable_id,
+        "gdrive_file_id": playable_gid,
+        "watch_url": f"/watch/{playable_gid}?share_token={access_token}"
     })
     resp.set_cookie(key=f"fow_share_{gdrive_id}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
+    if playable_gid != gdrive_id:
+        resp.set_cookie(key=f"fow_share_{playable_gid}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
     resp.set_cookie(key=f"fow_share_movie_{movie_id}", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
+    resp.set_cookie(key="fow_share_token", value=access_token, max_age=max_age_48h, httponly=True, samesite="lax")
     return resp
 
 

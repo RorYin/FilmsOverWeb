@@ -1324,6 +1324,93 @@ class TestFilmsOverWeb(unittest.TestCase):
         db.commit()
         db.close()
 
+    def test_21_shared_guest_plays_lowest_and_back_button_restricted(self):
+        """
+        Verify that for a 48h shared guest pass:
+        1. When opened, hitting play defaults to the lowest quality version even if 4K file was shared.
+        2. The back button inside the player links back to /share/{token}, NOT to the internal /movie/{id}.
+        3. Navigating to /movie/{id} as a shared user redirects safely to /share/{token} without asking to login.
+        """
+        db = SessionLocal()
+        # Clean up existing test movies
+        for m in db.query(Movie).filter(Movie.tmdb_id == 777666).all():
+            db.delete(m)
+        db.commit()
+
+        # Create 4K and 720p versions
+        m_4k = Movie(
+            title="Shared Multi Quality Film",
+            year=2024,
+            tmdb_id=777666,
+            resolution="4K UHD",
+            file_size=20 * 1024 * 1024 * 1024,
+            gdrive_file_id="gdrive_share_4k_fid",
+            file_name="Shared.Film.2024.2160p.4K.mkv",
+            codec="HEVC"
+        )
+        m_720 = Movie(
+            title="Shared Multi Quality Film",
+            year=2024,
+            tmdb_id=777666,
+            resolution="720p",
+            file_size=1 * 1024 * 1024 * 1024,
+            gdrive_file_id="gdrive_share_720p_fid",
+            file_name="Shared.Film.2024.720p.mkv",
+            codec="H.264"
+        )
+        db.add_all([m_4k, m_720])
+        db.commit()
+        db.refresh(m_4k)
+        db.refresh(m_720)
+        m_4k_id = m_4k.id
+        m_720_id = m_720.id
+        db.close()
+
+        # SuperAdmin creates a share link on the 4K version
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={"email": "test@gmail.com", "password": "1q2w3e4r5t", "next": "/"})
+        share_res = admin_client.post(f"/api/superadmin/movies/{m_4k_id}/share")
+        self.assertEqual(share_res.status_code, 200)
+        share_data = share_res.json()
+        share_url = share_data["relative_url"]
+        pin_code = share_data["pin_code"]
+
+        # Guest client opens share link: /share/gdrive_share_4k_fid?pin=xxxx
+        guest_client = TestClient(app)
+        open_res = guest_client.get(share_url)
+        self.assertEqual(open_res.status_code, 200)
+        self.assertIn(b"Unlocked", open_res.content)
+
+        # The play button on the share page must link to the lowest quality version (gdrive_share_720p_fid)
+        self.assertIn(b"/watch/gdrive_share_720p_fid", open_res.content)
+
+        # Guest clicks Play: loads /watch/gdrive_share_720p_fid
+        watch_res = guest_client.get("/watch/gdrive_share_720p_fid")
+        self.assertEqual(watch_res.status_code, 200)
+        # Player initializes with 720p file
+        self.assertIn(b"gdrive_share_720p_fid", watch_res.content)
+        # Back button must link back to /share/gdrive_share_4k_fid, NOT to /movie/
+        self.assertIn(b'href="/share/gdrive_share_4k_fid"', watch_res.content)
+        self.assertNotIn(b'href="/movie/', watch_res.content)
+
+        # Even if guest accesses the shared 4K URL directly (/watch/gdrive_share_4k_fid) without explicit select
+        watch_4k_direct = guest_client.get("/watch/gdrive_share_4k_fid")
+        self.assertEqual(watch_4k_direct.status_code, 200)
+        # Must still default to lowest 720p version!
+        self.assertIn(b"gdrive_share_720p_fid", watch_4k_direct.content)
+
+        # Guest clicking back or navigating to /movie/{m_4k_id} should redirect to /share/{token}
+        movie_redirect = guest_client.get(f"/movie/{m_4k_id}", follow_redirects=False)
+        self.assertEqual(movie_redirect.status_code, 302)
+        self.assertIn("/share/gdrive_share_4k_fid", movie_redirect.headers.get("location", ""))
+
+        # Clean up
+        db = SessionLocal()
+        for m in db.query(Movie).filter(Movie.tmdb_id == 777666).all():
+            db.delete(m)
+        db.commit()
+        db.close()
+
 if __name__ == "__main__":
     unittest.main()
 

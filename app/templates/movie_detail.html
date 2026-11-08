@@ -62,7 +62,7 @@
                         <p class="text-xs text-slate-300 mt-0.5">This browser is authorized for lossless Google Drive streaming of this movie.</p>
                     </div>
                 </div>
-                <a href="/watch/{% if is_share_page %}{{ movie.gdrive_file_id }}{% else %}{{ default_playable.id if default_playable else movie.id }}{% endif %}{% if share_token %}?share_token={{ share_token }}{% endif %}" class="bg-brand-red hover:bg-brand-redHover text-black px-5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-brand-red/20 transition">
+                <a href="/watch/{{ default_playable_target or (movie.gdrive_file_id if is_share_page else movie.id) }}{% if share_token %}?share_token={{ share_token }}{% endif %}" class="bg-brand-red hover:bg-brand-redHover text-black px-5 py-2.5 rounded-xl font-black text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-brand-red/20 transition">
                     <i data-lucide="play" class="w-3.5 h-3.5 fill-current"></i>
                     <span>Watch Movie</span>
                 </a>
@@ -112,7 +112,7 @@
                         <span>Enter PIN to Play</span>
                     </button>
                     {% else %}
-                    <a href="/watch/{% if is_share_page %}{{ movie.gdrive_file_id }}{% else %}{{ default_playable.id if default_playable else movie.id }}{% endif %}{% if is_share_page and share_token %}?share_token={{ share_token }}{% endif %}" class="w-full bg-brand-red hover:bg-brand-redHover text-black py-3.5 px-4 rounded-xl font-black text-center flex items-center justify-center space-x-2 shadow-xl shadow-brand-red/30 transition transform hover:scale-[1.02]">
+                    <a href="/watch/{{ default_playable_target or (movie.gdrive_file_id if is_share_page else movie.id) }}{% if is_share_page and share_token %}?share_token={{ share_token }}{% endif %}" class="w-full bg-brand-red hover:bg-brand-redHover text-black py-3.5 px-4 rounded-xl font-black text-center flex items-center justify-center space-x-2 shadow-xl shadow-brand-red/30 transition transform hover:scale-[1.02]">
                         <i data-lucide="play" class="w-5 h-5 fill-current"></i>
                         <span>
                             {% if progress and progress.position_seconds > 10 and not progress.completed %}
@@ -218,7 +218,7 @@
                                 <span>Enter PIN to Play</span>
                             </button>
                             {% else %}
-                            <a href="/watch/{% if is_share_page %}{{ movie.gdrive_file_id }}{% else %}{{ default_playable.id if default_playable else movie.id }}{% endif %}{% if is_share_page and share_token %}?share_token={{ share_token }}{% endif %}" class="inline-flex items-center space-x-2 bg-brand-red hover:bg-brand-redHover text-black px-5 py-2.5 rounded-xl font-extrabold text-sm shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
+                            <a href="/watch/{{ default_playable_target or (movie.gdrive_file_id if is_share_page else movie.id) }}{% if is_share_page and share_token %}?share_token={{ share_token }}{% endif %}" class="inline-flex items-center space-x-2 bg-brand-red hover:bg-brand-redHover text-black px-5 py-2.5 rounded-xl font-extrabold text-sm shadow-lg shadow-brand-red/30 transition transform hover:scale-105">
                                 <i data-lucide="play" class="w-4 h-4 fill-current"></i>
                                 <span>Play Movie</span>
                             </a>
@@ -701,7 +701,7 @@
             }
 
             // Immediately redirect to player with share authorization
-            window.location.href = data.watch_url || `/watch/{{ movie.gdrive_file_id }}?share_token=${data.token}`;
+            window.location.href = data.watch_url || `/watch/{{ default_playable_target or movie.gdrive_file_id }}?share_token=${data.token}`;
         } catch (err) {
             if (btn) {
                 btn.disabled = false;
