@@ -25,8 +25,13 @@ async def init_default_folders(db: SessionLocal):
                 continue
             existing = db.query(DriveFolder).filter(DriveFolder.folder_id == folder_id).first()
             if not existing:
-                meta = await fetch_folder_metadata(folder_id, db)
-                name = meta.get("name") or f"Drive Folder ({folder_id[:8]}...)"
+                name = f"Drive Folder ({folder_id[:8]}...)"
+                try:
+                    meta = await asyncio.wait_for(fetch_folder_metadata(folder_id, db), timeout=4.0)
+                    if meta.get("name"):
+                        name = meta.get("name")
+                except Exception as e:
+                    print(f"[STARTUP] Notice: fast metadata fetch skipped for {folder_id}: {e}")
                 folder = DriveFolder(
                     folder_id=folder_id,
                     folder_name=name,

@@ -209,7 +209,20 @@ class JsonDatabase:
             "tv_login_codes": [],
             "movie_share_pins": []
         }
+        self._last_mtime = None
+        self._cloud_disabled = False
+        self._cloud_failure_count = 0
+        self._cloud_cooldown_until = 0.0
+        self._cloud_sync_in_progress = False
+        self._cloud_sync_timer = None
+        self._cloud_dirty = False
+
+        # Load local database immediately (takes <5ms, never blocks startup)
         self.load()
+
+        # Non-blocking background fetch if cloud is configured
+        if self._can_use_cloud():
+            self.fetch_and_apply_cloud_snapshot()
 
     def _seed_persistent_disk_if_needed(self):
         if not os.path.exists(self.filepath):
@@ -223,8 +236,27 @@ class JsonDatabase:
                 except Exception as e:
                     print(f"[JSON_DB] Warning seeding persistent database: {e}")
 
+    def _is_cloud_configured(self) -> bool:
+        upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
+        upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+        jsonbin_id = os.getenv("JSONBIN_BIN_ID")
+        jsonbin_key = os.getenv("JSONBIN_API_KEY")
+        return bool((upstash_url and upstash_token) or (jsonbin_id and jsonbin_key))
+
+    def _can_use_cloud(self) -> bool:
+        if self._cloud_disabled:
+            return False
+        import time
+        if time.time() < self._cloud_cooldown_until:
+            return False
+        return self._is_cloud_configured()
+
     def _fetch_from_cloud(self) -> Optional[dict]:
         """Fetches the latest database JSON from cloud storage (Upstash Redis or JSONBin) if configured."""
+        if not self._can_use_cloud():
+            return None
+
+        import time
         browser_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 FilmsOverWeb/1.0"
 
         upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
@@ -239,18 +271,26 @@ class JsonDatabase:
                         "User-Agent": browser_ua
                     }
                 )
-                with urllib.request.urlopen(req, timeout=5) as resp:
+                with urllib.request.urlopen(req, timeout=3) as resp:
                     res = json.loads(resp.read().decode("utf-8"))
                     val = res.get("result")
                     if val:
+                        self._cloud_failure_count = 0
                         return json.loads(val) if isinstance(val, str) else val
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403):
+                    self._cloud_disabled = True
+                    print(f"[JSON_DB] Upstash credentials rejected (HTTP {e.code}). Cloud sync disabled. Running on local JSON.")
+                    return None
+                else:
+                    self._cloud_failure_count += 1
             except Exception as e:
+                self._cloud_failure_count += 1
                 print(f"[JSON_DB] Cloud fetch error from Upstash: {e}")
 
         jsonbin_id = os.getenv("JSONBIN_BIN_ID")
         jsonbin_key = os.getenv("JSONBIN_API_KEY")
-        if jsonbin_id and jsonbin_key:
-            # Try X-Master-Key first, then X-Access-Key
+        if jsonbin_id and jsonbin_key and not self._cloud_disabled:
             for key_header in ["X-Master-Key", "X-Access-Key"]:
                 try:
                     import urllib.request
@@ -261,121 +301,219 @@ class JsonDatabase:
                             "User-Agent": browser_ua
                         }
                     )
-                    with urllib.request.urlopen(req, timeout=5) as resp:
+                    with urllib.request.urlopen(req, timeout=3) as resp:
                         res = json.loads(resp.read().decode("utf-8"))
                         record = res.get("record")
                         if record and isinstance(record, dict):
+                            self._cloud_failure_count = 0
                             print(f"[JSON_DB] Successfully loaded database from JSONBin using {key_header}!")
                             return record
                 except urllib.error.HTTPError as e:
                     if e.code == 401 and key_header == "X-Master-Key":
                         continue
-                    err_msg = e.read().decode("utf-8", errors="ignore")
-                    print(f"[JSON_DB] Cloud fetch error from JSONBin ({key_header}): HTTP {e.code} {err_msg}")
+                    if e.code in (401, 403):
+                        self._cloud_disabled = True
+                        print(f"[JSON_DB] JSONBin credentials rejected (HTTP {e.code}). Cloud sync disabled permanently for this process. Running on local JSON.")
+                        return None
+                    elif e.code == 429:
+                        self._cloud_cooldown_until = time.time() + 600
+                        print("[JSON_DB] JSONBin rate limit reached (HTTP 429). Pausing cloud sync for 10 minutes.")
+                        return None
+                    else:
+                        self._cloud_failure_count += 1
+                        print(f"[JSON_DB] Cloud fetch error from JSONBin ({key_header}): HTTP {e.code}")
+                        break
                 except Exception as e:
+                    self._cloud_failure_count += 1
                     print(f"[JSON_DB] Cloud fetch error from JSONBin: {e}")
+                    break
+
+        if self._cloud_failure_count >= 3:
+            self._cloud_cooldown_until = time.time() + 600
+            print("[JSON_DB] Cloud provider unreachable after 3 attempts. Pausing cloud sync for 10 minutes.")
 
         return None
 
-    def _sync_to_cloud(self, data: dict):
-        """Asynchronously syncs database JSON to cloud storage (Upstash Redis or JSONBin)."""
-        browser_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 FilmsOverWeb/1.0"
+    def fetch_and_apply_cloud_snapshot(self):
+        """Asynchronously pulls latest cloud DB snapshot on startup without blocking server boot."""
+        if not self._can_use_cloud():
+            return
 
+        def _worker():
+            try:
+                cloud_data = self._fetch_from_cloud()
+                if cloud_data and isinstance(cloud_data, dict):
+                    has_tables = any(k in cloud_data for k in ["users", "movies", "drive_folders", "movie_share_pins"])
+                    if has_tables:
+                        with self.lock:
+                            for table_name, rows in cloud_data.items():
+                                model_cls = _REGISTERED_MODELS.get(table_name)
+                                if model_cls:
+                                    self.collections[table_name] = [
+                                        model_cls.from_dict(r) if isinstance(r, dict) else r for r in rows
+                                    ]
+                                else:
+                                    self.collections[table_name] = list(rows)
+                            try:
+                                with open(self.filepath, "w", encoding="utf-8") as f:
+                                    json.dump(cloud_data, f, indent=2, default=str)
+                                self._last_mtime = os.path.getmtime(self.filepath)
+                                print("[JSON_DB] Successfully synced and updated database from cloud!")
+                            except Exception as e:
+                                print(f"[JSON_DB] Warning saving cloud snapshot to disk: {e}")
+            except Exception as e:
+                print(f"[JSON_DB] Background cloud fetch error: {e}")
+
+        threading.Thread(target=_worker, daemon=True, name="CloudDbPull").start()
+
+    def _schedule_cloud_sync(self):
+        """Debounces cloud push so rapid local commits don't bombard cloud APIs with requests."""
+        if not self._can_use_cloud():
+            return
+
+        with self.lock:
+            self._cloud_dirty = True
+            if self._cloud_sync_timer is not None:
+                try:
+                    self._cloud_sync_timer.cancel()
+                except Exception:
+                    pass
+            self._cloud_sync_timer = threading.Timer(3.0, self._perform_cloud_push)
+            self._cloud_sync_timer.daemon = True
+            self._cloud_sync_timer.start()
+
+    def _perform_cloud_push(self):
+        if not self._can_use_cloud():
+            return
+
+        with self.lock:
+            if not self._cloud_dirty or self._cloud_sync_in_progress:
+                return
+            self._cloud_sync_in_progress = True
+            self._cloud_dirty = False
+            data = {}
+            for table_name, objects in self.collections.items():
+                data[table_name] = [obj.to_dict() if hasattr(obj, "to_dict") else obj for obj in objects]
+
+        def _push_worker():
+            try:
+                self._push_to_cloud(data)
+            finally:
+                with self.lock:
+                    self._cloud_sync_in_progress = False
+                    if self._cloud_dirty and self._can_use_cloud():
+                        self._schedule_cloud_sync()
+
+        threading.Thread(target=_push_worker, daemon=True, name="CloudDbPush").start()
+
+    def _push_to_cloud(self, data: dict):
+        if not self._can_use_cloud():
+            return
+
+        import time
+        browser_ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 FilmsOverWeb/1.0"
         upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
         upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
         jsonbin_id = os.getenv("JSONBIN_BIN_ID")
         jsonbin_key = os.getenv("JSONBIN_API_KEY")
 
-        if not ((upstash_url and upstash_token) or (jsonbin_id and jsonbin_key)):
-            return
+        if upstash_url and upstash_token:
+            try:
+                import urllib.request
+                body = json.dumps(["SET", "films_over_web_db", json.dumps(data)]).encode("utf-8")
+                req = urllib.request.Request(
+                    upstash_url.rstrip("/"),
+                    data=body,
+                    headers={
+                        "Authorization": f"Bearer {upstash_token}",
+                        "Content-Type": "application/json",
+                        "User-Agent": browser_ua
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=3):
+                    pass
+                self._cloud_failure_count = 0
+            except urllib.error.HTTPError as e:
+                if e.code in (401, 403):
+                    self._cloud_disabled = True
+                    print(f"[JSON_DB] Upstash credentials rejected (HTTP {e.code}). Cloud sync disabled.")
+                else:
+                    self._cloud_failure_count += 1
+            except Exception as e:
+                self._cloud_failure_count += 1
+                print(f"[JSON_DB] Cloud sync error to Upstash: {e}")
 
-        def _push():
-            if upstash_url and upstash_token:
+        if jsonbin_id and jsonbin_key and not self._cloud_disabled:
+            for key_header in ["X-Master-Key", "X-Access-Key"]:
                 try:
                     import urllib.request
-                    body = json.dumps(["SET", "films_over_web_db", json.dumps(data)]).encode("utf-8")
+                    body = json.dumps(data).encode("utf-8")
                     req = urllib.request.Request(
-                        upstash_url.rstrip("/"),
+                        f"https://api.jsonbin.io/v3/b/{jsonbin_id}",
                         data=body,
                         headers={
-                            "Authorization": f"Bearer {upstash_token}",
+                            key_header: jsonbin_key,
                             "Content-Type": "application/json",
                             "User-Agent": browser_ua
                         },
-                        method="POST"
+                        method="PUT"
                     )
-                    with urllib.request.urlopen(req, timeout=5):
-                        pass
+                    with urllib.request.urlopen(req, timeout=3):
+                        self._cloud_failure_count = 0
+                        break
+                except urllib.error.HTTPError as e:
+                    if e.code == 401 and key_header == "X-Master-Key":
+                        continue
+                    if e.code in (401, 403):
+                        self._cloud_disabled = True
+                        print(f"[JSON_DB] JSONBin credentials rejected (HTTP {e.code}). Cloud sync disabled permanently for this process. Running on local JSON.")
+                        break
+                    elif e.code == 429:
+                        self._cloud_cooldown_until = time.time() + 600
+                        print("[JSON_DB] JSONBin rate limit reached (HTTP 429). Pausing cloud sync for 10 minutes.")
+                        break
+                    else:
+                        self._cloud_failure_count += 1
+                        print(f"[JSON_DB] Cloud sync error to JSONBin ({key_header}): HTTP {e.code}")
+                        break
                 except Exception as e:
-                    print(f"[JSON_DB] Cloud sync error to Upstash: {e}")
+                    self._cloud_failure_count += 1
+                    print(f"[JSON_DB] Cloud sync error to JSONBin: {e}")
+                    break
 
-            if jsonbin_id and jsonbin_key:
-                for key_header in ["X-Master-Key", "X-Access-Key"]:
-                    try:
-                        import urllib.request
-                        body = json.dumps(data).encode("utf-8")
-                        req = urllib.request.Request(
-                            f"https://api.jsonbin.io/v3/b/{jsonbin_id}",
-                            data=body,
-                            headers={
-                                key_header: jsonbin_key,
-                                "Content-Type": "application/json",
-                                "User-Agent": browser_ua
-                            },
-                            method="PUT"
-                        )
-                        with urllib.request.urlopen(req, timeout=5):
-                            return
-                    except urllib.error.HTTPError as e:
-                        if e.code == 401 and key_header == "X-Master-Key":
-                            continue
-                        err_msg = e.read().decode("utf-8", errors="ignore")
-                        print(f"[JSON_DB] Cloud sync error to JSONBin ({key_header}): HTTP {e.code} {err_msg}")
-                        break
-                    except Exception as e:
-                        print(f"[JSON_DB] Cloud sync error to JSONBin: {e}")
-                        break
-
-        threading.Thread(target=_push, daemon=True).start()
+        if self._cloud_failure_count >= 3:
+            self._cloud_cooldown_until = time.time() + 600
+            print("[JSON_DB] Cloud provider unreachable after 3 attempts. Pausing cloud sync for 10 minutes.")
 
     def load(self):
         with self.lock:
             self._seed_persistent_disk_if_needed()
 
-            raw_data = None
-            cloud_data = self._fetch_from_cloud()
-            if cloud_data:
-                raw_data = cloud_data
-                try:
-                    with open(self.filepath, "w", encoding="utf-8") as f:
-                        json.dump(cloud_data, f, indent=2, default=str)
-                except Exception:
-                    pass
+            if not os.path.exists(self.filepath):
+                sqlite_path = getattr(settings, "BASE_DIR", Path(".")) / "films_over_web.db"
+                if os.path.exists(sqlite_path):
+                    self._migrate_from_sqlite(sqlite_path)
+                return
 
-            if not raw_data:
-                if not os.path.exists(self.filepath):
-                    sqlite_path = getattr(settings, "BASE_DIR", Path(".")) / "films_over_web.db"
-                    if os.path.exists(sqlite_path):
-                        self._migrate_from_sqlite(sqlite_path)
-                    return
+            try:
+                mtime = os.path.getmtime(self.filepath)
+                self._last_mtime = mtime
+                with open(self.filepath, "r", encoding="utf-8") as f:
+                    raw_data = json.load(f)
+            except Exception as e:
+                print(f"[JSON_DB] Warning: failed to parse {self.filepath}: {e}")
+                return
 
-                try:
-                    mtime = os.path.getmtime(self.filepath)
-                    self._last_mtime = mtime
-                    with open(self.filepath, "r", encoding="utf-8") as f:
-                        raw_data = json.load(f)
-                except Exception as e:
-                    print(f"[JSON_DB] Warning: failed to parse {self.filepath}: {e}")
-                    return
-
-            for table_name, rows in raw_data.items():
-                model_cls = _REGISTERED_MODELS.get(table_name)
-                if model_cls:
-                    self.collections[table_name] = [
-                        model_cls.from_dict(r) if isinstance(r, dict) else r for r in rows
-                    ]
-                else:
-                    self.collections[table_name] = list(rows)
+            if isinstance(raw_data, dict):
+                for table_name, rows in raw_data.items():
+                    model_cls = _REGISTERED_MODELS.get(table_name)
+                    if model_cls:
+                        self.collections[table_name] = [
+                            model_cls.from_dict(r) if isinstance(r, dict) else r for r in rows
+                        ]
+                    else:
+                        self.collections[table_name] = list(rows)
 
     def _migrate_from_sqlite(self, sqlite_path):
         try:
@@ -434,7 +572,7 @@ class JsonDatabase:
             except Exception:
                 pass
 
-            self._sync_to_cloud(data)
+            self._schedule_cloud_sync()
 
     def get_collection(self, model_cls):
         with self.lock:

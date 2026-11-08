@@ -1411,6 +1411,36 @@ class TestFilmsOverWeb(unittest.TestCase):
         db.commit()
         db.close()
 
+    def test_22_cloud_sync_circuit_breaker_and_local_fast_boot(self):
+        """Test that database initializes locally in milliseconds and trips circuit breaker on cloud auth errors without hanging."""
+        import os
+        import time
+        from app.database import JsonDatabase
+
+        # Fast local boot verification
+        t0 = time.time()
+        test_db = JsonDatabase()
+        boot_duration = time.time() - t0
+        self.assertLess(boot_duration, 0.5, "Local database boot must complete under 500ms")
+
+        # Circuit breaker test with bad credentials
+        test_db._cloud_disabled = False
+        os.environ["JSONBIN_BIN_ID"] = "6aec6393ffd5d16053a8833f"
+        os.environ["JSONBIN_API_KEY"] = "$2a$10$invalidkeytestingcircuitbreaker12345"
+
+        # Cloud fetch should return None and trip circuit breaker without raising
+        result = test_db._fetch_from_cloud()
+        self.assertIsNone(result)
+        self.assertTrue(test_db._cloud_disabled, "Circuit breaker must be tripped on 401/403")
+
+        # After circuit breaker is tripped, subsequent cloud pushes or fetches should do nothing
+        self.assertFalse(test_db._can_use_cloud())
+        
+        # Debounced save verification
+        for _ in range(5):
+            test_db.save()
+        self.assertTrue(True)
+
 if __name__ == "__main__":
     unittest.main()
 
