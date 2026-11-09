@@ -260,67 +260,70 @@
                     </p>
                 </div>
 
-                <!-- Cast & Director Section with TMDB Profile Images -->
+                <!-- Cast & Crew Rows (Row 1: Director & Crew, Row 2: Starring Cast) -->
                 {% if credits_data and (credits_data.directors or credits_data.cast) %}
-                <div class="space-y-3 pt-1">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
-                        <i data-lucide="users" class="w-4 h-4 text-amber-400"></i>
-                        <span>Director & Starring Cast</span>
-                    </h3>
-
-                    <!-- Scrollable tray of Director & Cast Cards -->
-                    <div class="flex items-start gap-4 sm:gap-5 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-slate-700/60 scrollbar-track-transparent">
-                        
-                        <!-- Director Card(s) -->
-                        {% for dir in credits_data.directors %}
-                        <div class="flex flex-col items-center flex-none w-20 sm:w-24 text-center group">
-                            <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-amber-500/60 bg-gradient-to-br from-amber-500/20 via-slate-800 to-slate-900 shadow-lg shadow-amber-500/10 group-hover:border-amber-400 transition-all duration-300 transform group-hover:scale-105">
-                                {% if dir.profile_path %}
-                                <img src="{{ dir.profile_path }}" alt="{{ dir.name }}" class="w-full h-full object-cover" loading="lazy">
-                                {% else %}
-                                <div class="w-full h-full flex items-center justify-center text-amber-300 font-black text-lg sm:text-xl">
-                                    {{ dir.name[:2]|upper }}
+                <div class="space-y-5 pt-1">
+                    
+                    <!-- Row 1: Director & Crew -->
+                    {% if credits_data.directors %}
+                    <div class="space-y-2.5">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
+                            <i data-lucide="clapperboard" class="w-3.5 h-3.5 text-amber-400/90"></i>
+                            <span>Director & Crew</span>
+                        </h3>
+                        <div class="flex items-start gap-4 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-thin scrollbar-thumb-slate-700/60 scrollbar-track-transparent">
+                            {% for person in credits_data.directors %}
+                            <div class="flex flex-col items-center flex-none w-24 sm:w-28 text-center group">
+                                <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-slate-500 transition-all duration-200">
+                                    {% if person.profile_path %}
+                                    <img src="{{ person.profile_path }}" alt="{{ person.name }}" class="w-full h-full object-cover" loading="lazy">
+                                    {% else %}
+                                    <div class="w-full h-full flex items-center justify-center text-slate-300 font-bold text-base">
+                                        {{ person.name[:2]|upper }}
+                                    </div>
+                                    {% endif %}
                                 </div>
-                                {% endif %}
-                            </div>
-                            <span class="mt-1.5 inline-block text-[9px] uppercase font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 tracking-wider">
-                                Director
-                            </span>
-                            <span class="mt-1 text-xs font-bold text-white truncate w-full" title="{{ dir.name }}">
-                                {{ dir.name }}
-                            </span>
-                        </div>
-                        {% endfor %}
-
-                        {% if credits_data.directors and credits_data.cast %}
-                        <!-- Visual separator between Director and Cast -->
-                        <div class="h-16 sm:h-20 w-px bg-slate-800 self-center flex-none my-auto"></div>
-                        {% endif %}
-
-                        <!-- Cast Members -->
-                        {% for actor in credits_data.cast %}
-                        <div class="flex flex-col items-center flex-none w-20 sm:w-24 text-center group">
-                            <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-brand-red/70 transition-all duration-300 transform group-hover:scale-105">
-                                {% if actor.profile_path %}
-                                <img src="{{ actor.profile_path }}" alt="{{ actor.name }}" class="w-full h-full object-cover" loading="lazy">
-                                {% else %}
-                                <div class="w-full h-full flex items-center justify-center text-slate-300 font-black text-lg sm:text-xl">
-                                    {{ actor.name[:2]|upper }}
+                                <div class="mt-2 text-center w-full px-1 leading-tight">
+                                    <span class="text-xs font-medium text-slate-200 block truncate" title="{{ person.name }} ({{ person.job or 'Director' }})">
+                                        {{ person.name }} <span class="text-amber-400/90 text-[11px] font-normal">({{ person.job or 'Director' }})</span>
+                                    </span>
                                 </div>
-                                {% endif %}
                             </div>
-                            <span class="mt-2 text-xs font-bold text-slate-200 group-hover:text-white truncate w-full" title="{{ actor.name }}">
-                                {{ actor.name }}
-                            </span>
-                            {% if actor.character %}
-                            <span class="text-[10px] text-slate-400 truncate w-full" title="{{ actor.character }}">
-                                {{ actor.character }}
-                            </span>
-                            {% endif %}
+                            {% endfor %}
                         </div>
-                        {% endfor %}
-
                     </div>
+                    {% endif %}
+
+                    <!-- Row 2: Starring Cast -->
+                    {% if credits_data.cast %}
+                    <div class="space-y-2.5">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
+                            <i data-lucide="users" class="w-3.5 h-3.5 text-slate-400"></i>
+                            <span>Starring Cast</span>
+                        </h3>
+                        <div class="flex items-start gap-4 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-thin scrollbar-thumb-slate-700/60 scrollbar-track-transparent">
+                            {% for actor in credits_data.cast %}
+                            <div class="flex flex-col items-center flex-none w-24 sm:w-28 text-center group">
+                                <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-slate-500 transition-all duration-200">
+                                    {% if actor.profile_path %}
+                                    <img src="{{ actor.profile_path }}" alt="{{ actor.name }}" class="w-full h-full object-cover" loading="lazy">
+                                    {% else %}
+                                    <div class="w-full h-full flex items-center justify-center text-slate-300 font-bold text-base">
+                                        {{ actor.name[:2]|upper }}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="mt-2 text-center w-full px-1 leading-tight">
+                                    <span class="text-xs font-medium text-slate-200 block truncate" title="{% if actor.character %}{{ actor.name }} ({{ actor.character }}){% else %}{{ actor.name }}{% endif %}">
+                                        {{ actor.name }}{% if actor.character %} <span class="text-slate-400 text-[11px] font-normal">({{ actor.character }})</span>{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
                 </div>
                 {% endif %}
 

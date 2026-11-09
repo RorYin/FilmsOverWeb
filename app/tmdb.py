@@ -89,15 +89,40 @@ async def fetch_movie_credits(tmdb_id: int, api_key: Optional[str] = None) -> Di
             if resp.status_code == 200:
                 data = resp.json()
                 directors = []
+                seen_crew = set()
                 for crew in data.get("crew", []):
                     if crew.get("job") == "Director":
-                        p = crew.get("profile_path")
-                        directors.append({
-                            "id": crew.get("id"),
-                            "name": crew.get("name"),
-                            "job": "Director",
-                            "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
-                        })
+                        cid = crew.get("id") or crew.get("name")
+                        if cid not in seen_crew:
+                            seen_crew.add(cid)
+                            p = crew.get("profile_path")
+                            directors.append({
+                                "id": crew.get("id"),
+                                "name": crew.get("name"),
+                                "job": "Director",
+                                "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                            })
+
+                job_labels = {
+                    "Writer": "Writer",
+                    "Screenplay": "Screenplay",
+                    "Story": "Story",
+                    "Original Music Composer": "Music",
+                    "Music": "Music"
+                }
+                for crew in data.get("crew", []):
+                    job = crew.get("job")
+                    if job in job_labels:
+                        cid = crew.get("id") or crew.get("name")
+                        if cid not in seen_crew:
+                            seen_crew.add(cid)
+                            p = crew.get("profile_path")
+                            directors.append({
+                                "id": crew.get("id"),
+                                "name": crew.get("name"),
+                                "job": job_labels[job],
+                                "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                            })
 
                 cast = []
                 for actor in data.get("cast", [])[:10]:
@@ -202,15 +227,41 @@ async def enrich_movie_data(title: str, year: Optional[int] = None, api_key: Opt
 
         if tmdb_id:
             directors_cached = []
+            seen_crew = set()
             for crew in credits.get("crew", []):
                 if crew.get("job") == "Director":
-                    p = crew.get("profile_path")
-                    directors_cached.append({
-                        "id": crew.get("id"),
-                        "name": crew.get("name"),
-                        "job": "Director",
-                        "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
-                    })
+                    cid = crew.get("id") or crew.get("name")
+                    if cid not in seen_crew:
+                        seen_crew.add(cid)
+                        p = crew.get("profile_path")
+                        directors_cached.append({
+                            "id": crew.get("id"),
+                            "name": crew.get("name"),
+                            "job": "Director",
+                            "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                        })
+
+            job_labels = {
+                "Writer": "Writer",
+                "Screenplay": "Screenplay",
+                "Story": "Story",
+                "Original Music Composer": "Music",
+                "Music": "Music"
+            }
+            for crew in credits.get("crew", []):
+                job = crew.get("job")
+                if job in job_labels:
+                    cid = crew.get("id") or crew.get("name")
+                    if cid not in seen_crew:
+                        seen_crew.add(cid)
+                        p = crew.get("profile_path")
+                        directors_cached.append({
+                            "id": crew.get("id"),
+                            "name": crew.get("name"),
+                            "job": job_labels[job],
+                            "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                        })
+
             cast_cached = []
             for actor in credits.get("cast", [])[:10]:
                 if actor.get("name"):
