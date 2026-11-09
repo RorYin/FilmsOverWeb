@@ -126,6 +126,13 @@
                     </a>
                     {% endif %}
 
+                    {% if movie.trailer_url %}
+                    <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-xl font-bold text-xs text-center flex items-center justify-center space-x-2 shadow-lg shadow-red-600/25 transition transform hover:scale-[1.02]" title="Watch Official Trailer on YouTube">
+                        <i data-lucide="youtube" class="w-4 h-4 fill-current"></i>
+                        <span>Watch Official Trailer</span>
+                    </a>
+                    {% endif %}
+
                     {% if quality_versions and quality_versions|length > 1 and not is_share_page %}
                     <div class="pt-2">
                         <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Available Qualities in Drive:</span>
@@ -224,6 +231,13 @@
                             </a>
                             {% endif %}
 
+                            {% if movie.trailer_url %}
+                            <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-red-600/25 transition transform hover:scale-105" title="Watch official trailer on YouTube">
+                                <i data-lucide="youtube" class="w-4 h-4 fill-current"></i>
+                                <span>Watch Trailer</span>
+                            </a>
+                            {% endif %}
+
                             {# Share Movie Button 2 (Header Next to Play) - SuperAdmin Only #}
                             {% if user.role == 'superadmin' and not is_share_page %}
                             <button type="button" onclick="openSuperAdminShareModal()" class="inline-flex items-center space-x-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 px-4 py-2.5 rounded-xl font-extrabold text-sm shadow-md transition transform hover:scale-105 cursor-pointer" title="Generate 48h single-use PIN share link">
@@ -274,19 +288,18 @@
                         <div class="flex items-start gap-4 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-thin scrollbar-thumb-slate-700/60 scrollbar-track-transparent">
                             {% for person in credits_data.directors %}
                             <div class="flex flex-col items-center flex-none w-24 sm:w-28 text-center group">
-                                <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-slate-500 transition-all duration-200">
+                                <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-slate-500 transition-all duration-200">
                                     {% if person.profile_path %}
-                                    <img src="{{ person.profile_path }}" alt="{{ person.name }}" class="w-full h-full object-cover" loading="lazy">
+                                    <img src="{{ person.profile_path }}" alt="{{ person.name }}" class="w-full h-full object-cover rounded-full" loading="lazy">
                                     {% else %}
-                                    <div class="w-full h-full flex items-center justify-center text-slate-300 font-bold text-base">
+                                    <div class="w-full h-full flex items-center justify-center text-slate-300 font-bold text-base rounded-full">
                                         {{ person.name[:2]|upper }}
                                     </div>
                                     {% endif %}
                                 </div>
-                                <div class="mt-2 text-center w-full px-1 leading-tight">
-                                    <span class="text-xs font-medium text-slate-200 block truncate" title="{{ person.name }} ({{ person.job or 'Director' }})">
-                                        {{ person.name }} <span class="text-amber-400/90 text-[11px] font-normal">({{ person.job or 'Director' }})</span>
-                                    </span>
+                                <div class="mt-2 text-center w-full px-1">
+                                    <span class="text-xs font-medium text-slate-200 block truncate" title="{{ person.name }}">{{ person.name }}</span>
+                                    <span class="text-[11px] text-amber-400/90 font-normal block truncate" title="{{ person.job or 'Director' }}">({{ person.job or 'Director' }})</span>
                                 </div>
                             </div>
                             {% endfor %}
@@ -304,18 +317,19 @@
                         <div class="flex items-start gap-4 sm:gap-5 overflow-x-auto pb-2 pt-1 scrollbar-thin scrollbar-thumb-slate-700/60 scrollbar-track-transparent">
                             {% for actor in credits_data.cast %}
                             <div class="flex flex-col items-center flex-none w-24 sm:w-28 text-center group">
-                                <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-slate-500 transition-all duration-200">
+                                <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-slate-500 transition-all duration-200">
                                     {% if actor.profile_path %}
-                                    <img src="{{ actor.profile_path }}" alt="{{ actor.name }}" class="w-full h-full object-cover" loading="lazy">
+                                    <img src="{{ actor.profile_path }}" alt="{{ actor.name }}" class="w-full h-full object-cover rounded-full" loading="lazy">
                                     {% else %}
-                                    <div class="w-full h-full flex items-center justify-center text-slate-300 font-bold text-base">
+                                    <div class="w-full h-full flex items-center justify-center text-slate-300 font-bold text-base rounded-full">
                                         {{ actor.name[:2]|upper }}
                                     </div>
                                     {% endif %}
                                 </div>
-                                <div class="mt-2 text-center w-full px-1 leading-tight">
-                                    <span class="text-xs font-medium text-slate-200 block truncate" title="{% if actor.character %}{{ actor.name }} ({{ actor.character }}){% else %}{{ actor.name }}{% endif %}">
-                                        {{ actor.name }}{% if actor.character %} <span class="text-slate-400 text-[11px] font-normal">({{ actor.character }})</span>{% endif %}
+                                <div class="mt-2 text-center w-full px-1">
+                                    <span class="text-xs font-medium text-slate-200 block truncate" title="{{ actor.name }}">{{ actor.name }}</span>
+                                    <span class="text-[11px] text-slate-400 font-normal block truncate" title="{{ actor.character or '' }}">
+                                        {% if actor.character %}({{ actor.character }}){% else %}&nbsp;{% endif %}
                                     </span>
                                 </div>
                             </div>
@@ -388,16 +402,6 @@
                         {% endif %}
                     </div>
                 </div>
-
-                <!-- Trailer link if available -->
-                {% if movie.trailer_url %}
-                <div class="pt-2">
-                    <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-2 text-rose-400 hover:text-rose-300 text-xs font-semibold">
-                        <i data-lucide="youtube" class="w-4 h-4"></i>
-                        <span>Watch Official Trailer on YouTube &rarr;</span>
-                    </a>
-                </div>
-                {% endif %}
 
             </div>
         </div>
