@@ -127,8 +127,8 @@
                     {% endif %}
 
                     {% if movie.trailer_url %}
-                    <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-xl font-bold text-xs text-center flex items-center justify-center space-x-2 shadow-lg shadow-red-600/25 transition transform hover:scale-[1.02]" title="Watch Official Trailer on YouTube">
-                        <i data-lucide="youtube" class="w-4 h-4 fill-current"></i>
+                    <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="w-full backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 text-white py-3 px-4 rounded-xl font-bold text-xs text-center flex items-center justify-center space-x-2 shadow-lg shadow-black/25 transition-all duration-200 transform hover:scale-[1.02]" title="Watch Official Trailer on YouTube">
+                        <i data-lucide="youtube" class="w-4 h-4 text-red-500 fill-current"></i>
                         <span>Watch Official Trailer</span>
                     </a>
                     {% endif %}
@@ -176,7 +176,7 @@
             <div class="flex-1 space-y-6">
                 <!-- Title & Tagline -->
                 <div>
-                    <div class="flex flex-wrap items-center gap-2 mb-2">
+                    <div class="flex flex-wrap items-center gap-2 mb-2.5">
                         <span class="bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                             {{ movie.year or 'Movie' }}
                         </span>
@@ -189,6 +189,20 @@
                             <i data-lucide="languages" class="w-3.5 h-3.5 text-amber-400"></i>
                             <span>Original: {{ movie.original_language }}</span>
                         </span>
+                        {% endif %}
+
+                        {% if movie.genres %}
+                            {% for g in movie.genres.split(',') %}
+                                {% if is_share_page or user.is_shared %}
+                                <span class="bg-slate-800/80 border border-slate-700/80 text-slate-300 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                                    {{ g.strip() }}
+                                </span>
+                                {% else %}
+                                <a href="/movies?genre={{ g.strip() }}" class="bg-slate-800/80 border border-slate-700/80 hover:border-slate-500 text-slate-300 text-xs font-medium px-2.5 py-0.5 rounded-full transition hover:text-white">
+                                    {{ g.strip() }}
+                                </a>
+                                {% endif %}
+                            {% endfor %}
                         {% endif %}
                     </div>
 
@@ -215,8 +229,8 @@
                             {% endif %}
 
                             {% if movie.trailer_url %}
-                            <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-red-600/25 transition transform hover:scale-105" title="Watch official trailer on YouTube">
-                                <i data-lucide="youtube" class="w-4 h-4 fill-current"></i>
+                            <a href="{{ movie.trailer_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-2 backdrop-blur-md bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-black/25 transition-all duration-200 transform hover:scale-105" title="Watch official trailer on YouTube">
+                                <i data-lucide="youtube" class="w-4 h-4 text-red-500 fill-current"></i>
                                 <span>Watch Trailer</span>
                             </a>
                             {% endif %}
@@ -231,23 +245,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Genres -->
-                {% if movie.genres %}
-                <div class="flex flex-wrap gap-2">
-                    {% for g in movie.genres.split(',') %}
-                        {% if is_share_page or user.is_shared %}
-                        <span class="bg-brand-surface border border-brand-border text-slate-300 px-3 py-1 rounded-md text-xs font-medium">
-                            {{ g.strip() }}
-                        </span>
-                        {% else %}
-                        <a href="/movies?genre={{ g.strip() }}" class="bg-brand-surface border border-brand-border hover:border-slate-500 text-slate-300 px-3 py-1 rounded-md text-xs font-medium transition">
-                            {{ g.strip() }}
-                        </a>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                {% endif %}
 
                 <!-- Overview -->
                 <div class="space-y-2">
