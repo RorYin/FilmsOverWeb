@@ -342,6 +342,38 @@ def is_movie_authorized_for_shared_user(movie: Movie, user: User, db: Session) -
 
     return False
 
+async def get_movie_credits_context(movie: Movie, db: Session) -> Dict[str, Any]:
+    from app.tmdb import get_active_tmdb_key, fetch_movie_credits
+    api_key = get_active_tmdb_key(db)
+    credits_data = {"directors": [], "cast": []}
+    if movie.tmdb_id and api_key:
+        credits_data = await fetch_movie_credits(movie.tmdb_id, api_key)
+
+    # Fallback for director if TMDB returned none or is offline
+    if not credits_data.get("directors") and movie.director:
+        credits_data["directors"] = [{
+            "id": None,
+            "name": movie.director.strip(),
+            "job": "Director",
+            "profile_path": None
+        }]
+
+    # Fallback for cast if TMDB returned none or is offline
+    if not credits_data.get("cast") and movie.cast:
+        cast_list = []
+        for name in movie.cast.split(","):
+            c_name = name.strip()
+            if c_name:
+                cast_list.append({
+                    "id": None,
+                    "name": c_name,
+                    "character": "",
+                    "profile_path": None
+                })
+        credits_data["cast"] = cast_list
+
+    return credits_data
+
 @router.get("/movie/{movie_id}", response_class=HTMLResponse)
 async def movie_detail(
     movie_id: str,
@@ -385,6 +417,7 @@ async def movie_detail(
         related = deduplicate_movies(raw_related)[:6]
 
     og_data = get_movie_og_data(movie, request)
+    credits_data = await get_movie_credits_context(movie, db)
 
     return templates.TemplateResponse(
         request=request,
@@ -392,6 +425,7 @@ async def movie_detail(
         context={
             "user": user,
             "movie": movie,
+            "credits_data": credits_data,
             "progress": progress,
             "quality_versions": quality_versions,
             "default_playable": default_playable,
@@ -662,6 +696,7 @@ async def view_shared_movie(
 
     gdrive_id = movie.gdrive_file_id
     og_data = get_movie_og_data(movie, request)
+    credits_data = await get_movie_credits_context(movie, db)
 
     # Scrapers (WhatsApp, Facebook, Twitter, Telegram, Discord, etc.) visit links to fetch OpenGraph preview images.
     # We MUST return the rich page with og_data, but NEVER consume or expire the single-use PIN!
@@ -691,6 +726,7 @@ async def view_shared_movie(
             context={
                 "user": shared_user,
                 "movie": movie,
+                "credits_data": credits_data,
                 "progress": None,
                 "quality_versions": quality_versions,
                 "default_playable": default_playable,
@@ -742,6 +778,7 @@ async def view_shared_movie(
             context={
                 "user": shared_user,
                 "movie": movie,
+                "credits_data": credits_data,
                 "progress": None,
                 "quality_versions": quality_versions,
                 "default_playable": default_playable,
@@ -836,6 +873,7 @@ async def view_shared_movie(
             context={
                 "user": shared_user,
                 "movie": movie,
+                "credits_data": credits_data,
                 "progress": None,
                 "quality_versions": quality_versions,
                 "default_playable": default_playable,
@@ -880,6 +918,7 @@ async def view_shared_movie(
         context={
             "user": shared_user,
             "movie": movie,
+            "credits_data": credits_data,
             "progress": None,
             "quality_versions": quality_versions,
             "default_playable": default_playable,

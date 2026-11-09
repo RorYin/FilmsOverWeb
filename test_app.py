@@ -1441,6 +1441,58 @@ class TestFilmsOverWeb(unittest.TestCase):
             test_db.save()
         self.assertTrue(True)
 
+    def test_23_movie_detail_cast_and_director_images_and_collapsible_specs(self):
+        """Test movie info page: Cast and Director images/cards, collapsible specs (closed by default), and role-based permissions."""
+        from app.models import Movie, User
+        db = SessionLocal()
+        admin_u = db.query(User).filter(User.email == "test@gmail.com").first()
+        if admin_u:
+            admin_u.must_change_password = False
+            db.commit()
+
+        movie = db.query(Movie).first()
+        self.assertIsNotNone(movie, "At least one movie must exist in database")
+        movie_id = movie.id
+        gdrive_id = movie.gdrive_file_id
+        db.close()
+
+        # 1. SuperAdmin tests
+        admin_client = TestClient(app)
+        admin_client.post("/login", data={"email": "test@gmail.com", "password": "1q2w3e4r5t", "next": "/"})
+        admin_res = admin_client.get(f"/movie/{movie_id}")
+        self.assertEqual(admin_res.status_code, 200)
+        self.assertIn("Director & Starring Cast", admin_res.text)
+        self.assertIn('id="drive-specs-content" class="hidden', admin_res.text)
+        self.assertIn("Share Movie", admin_res.text)
+        self.assertIn("Open raw file in Google Drive", admin_res.text)
+
+        # 2. Regular Guest tests
+        guest_client = TestClient(app)
+        guest_client.post("/login", data={"email": "guest@filmsoverweb.com", "password": "guest@123", "next": "/"})
+        guest_res = guest_client.get(f"/movie/{movie_id}")
+        self.assertEqual(guest_res.status_code, 200)
+        self.assertIn("Director & Starring Cast", guest_res.text)
+        self.assertIn('id="drive-specs-content" class="hidden', guest_res.text)
+        self.assertNotIn("Share Movie", guest_res.text)
+        self.assertNotIn("Open raw file in Google Drive", guest_res.text)
+
+        # 3. Shared Movie Pass tests
+        # Generate share link
+        share_res = admin_client.post(f"/api/superadmin/movies/{movie_id}/share")
+        self.assertEqual(share_res.status_code, 200)
+        share_data = share_res.json()
+        share_url = share_data["relative_url"]
+
+        shared_viewer = TestClient(app)
+        shared_page = shared_viewer.get(share_url)
+        self.assertEqual(shared_page.status_code, 200)
+        self.assertIn("Director & Starring Cast", shared_page.text)
+        self.assertIn('id="drive-specs-content" class="hidden', shared_page.text)
+        self.assertNotIn("Share Movie", shared_page.text)
+        self.assertNotIn("Open raw file in Google Drive", shared_page.text)
+        self.assertNotIn("More Like This", shared_page.text)
+        self.assertIn("48-Hour Guest Pass Active", shared_page.text)
+
 if __name__ == "__main__":
     unittest.main()
 

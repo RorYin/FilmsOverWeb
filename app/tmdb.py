@@ -9,6 +9,7 @@ TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p"
 
 # In-Memory Cache to minimize TMDB API calls
 _TMDB_CACHE: Dict[str, Dict[str, Any]] = {}
+_CREDITS_CACHE: Dict[int, Dict[str, Any]] = {}
 
 def get_active_tmdb_key(db: Optional[Session] = None) -> str:
     if db:
@@ -64,6 +65,57 @@ async def fetch_movie_full_details(tmdb_id: int, api_key: str) -> Optional[Dict[
         except Exception as e:
             print(f"[TMDB] Details fetch error for ID {tmdb_id}: {e}")
     return None
+
+async def fetch_movie_credits(tmdb_id: int, api_key: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Fetches credits (cast and crew with images) for a movie from TMDB with memory caching.
+    """
+    if not tmdb_id:
+        return {"directors": [], "cast": []}
+
+    if tmdb_id in _CREDITS_CACHE:
+        return _CREDITS_CACHE[tmdb_id]
+
+    if not api_key:
+        return {"directors": [], "cast": []}
+
+    result = {"directors": [], "cast": []}
+    headers = {"Accept": "application/json"}
+    params = {"api_key": api_key}
+
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        try:
+            resp = await client.get(f"{TMDB_BASE_URL}/movie/{tmdb_id}/credits", params=params, headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                directors = []
+                for crew in data.get("crew", []):
+                    if crew.get("job") == "Director":
+                        p = crew.get("profile_path")
+                        directors.append({
+                            "id": crew.get("id"),
+                            "name": crew.get("name"),
+                            "job": "Director",
+                            "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                        })
+
+                cast = []
+                for actor in data.get("cast", [])[:10]:
+                    if actor.get("name"):
+                        p = actor.get("profile_path")
+                        cast.append({
+                            "id": actor.get("id"),
+                            "name": actor.get("name"),
+                            "character": actor.get("character") or "",
+                            "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                        })
+
+                result = {"directors": directors, "cast": cast}
+                _CREDITS_CACHE[tmdb_id] = result
+        except Exception as e:
+            print(f"[TMDB] Credits fetch error for ID {tmdb_id}: {e}")
+
+    return result
 
 LANGUAGE_MAP = {
     "ta": "Tamil", "kn": "Kannada", "te": "Telugu", "ml": "Malayalam",
@@ -147,6 +199,29 @@ async def enrich_movie_data(title: str, year: Optional[int] = None, api_key: Opt
             if crew.get("job") == "Director":
                 director = crew.get("name", "")
                 break
+
+        if tmdb_id:
+            directors_cached = []
+            for crew in credits.get("crew", []):
+                if crew.get("job") == "Director":
+                    p = crew.get("profile_path")
+                    directors_cached.append({
+                        "id": crew.get("id"),
+                        "name": crew.get("name"),
+                        "job": "Director",
+                        "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                    })
+            cast_cached = []
+            for actor in credits.get("cast", [])[:10]:
+                if actor.get("name"):
+                    p = actor.get("profile_path")
+                    cast_cached.append({
+                        "id": actor.get("id"),
+                        "name": actor.get("name"),
+                        "character": actor.get("character") or "",
+                        "profile_path": f"{TMDB_IMAGE_BASE}/w185{p}" if p else None
+                    })
+            _CREDITS_CACHE[tmdb_id] = {"directors": directors_cached, "cast": cast_cached}
 
     # Process trailer
     trailer_url = None

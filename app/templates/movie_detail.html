@@ -151,7 +151,7 @@
                     </div>
                     {% endif %}
 
-                    <!-- Share Movie Button 1 (Poster Column) - SuperAdmin Only -->
+                    {# Share Movie Button 1 (Poster Column) - SuperAdmin Only #}
                     {% if user.role == 'superadmin' and not is_share_page %}
                     <button type="button" onclick="openSuperAdminShareModal()" class="w-full bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 py-2.5 px-4 rounded-xl font-bold text-xs text-center flex items-center justify-center space-x-2 transition shadow-sm cursor-pointer" title="Generate 48h single-use PIN share link">
                         <i data-lucide="share-2" class="w-4 h-4 text-amber-400"></i>
@@ -224,7 +224,7 @@
                             </a>
                             {% endif %}
 
-                            <!-- Share Movie Button 2 (Header Next to Play) - SuperAdmin Only -->
+                            {# Share Movie Button 2 (Header Next to Play) - SuperAdmin Only #}
                             {% if user.role == 'superadmin' and not is_share_page %}
                             <button type="button" onclick="openSuperAdminShareModal()" class="inline-flex items-center space-x-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/50 px-4 py-2.5 rounded-xl font-extrabold text-sm shadow-md transition transform hover:scale-105 cursor-pointer" title="Generate 48h single-use PIN share link">
                                 <i data-lucide="share-2" class="w-4 h-4 text-amber-400"></i>
@@ -260,76 +260,130 @@
                     </p>
                 </div>
 
-                <!-- Cast & Crew & Metadata Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs sm:text-sm">
-                    {% if movie.original_language %}
-                    <div class="bg-brand-surface p-3.5 rounded-xl border border-amber-500/50 bg-gradient-to-br from-amber-500/15 via-brand-surface to-brand-surface shadow-md">
-                        <span class="text-amber-400 uppercase tracking-wider text-[11px] font-bold block mb-1 flex items-center space-x-1.5">
-                            <i data-lucide="globe" class="w-3.5 h-3.5"></i>
-                            <span>Original Language</span>
-                        </span>
-                        <span class="text-white font-extrabold text-sm sm:text-base">{{ movie.original_language }}</span>
-                    </div>
-                    {% endif %}
-
-                    {% if movie.director %}
-                    <div class="bg-brand-surface p-3.5 rounded-xl border border-brand-border">
-                        <span class="text-slate-500 uppercase tracking-wider text-[11px] font-bold block mb-1">Director</span>
-                        <span class="text-white font-medium">{{ movie.director }}</span>
-                    </div>
-                    {% endif %}
-
-                    {% if movie.cast %}
-                    <div class="bg-brand-surface p-3.5 rounded-xl border border-brand-border">
-                        <span class="text-slate-500 uppercase tracking-wider text-[11px] font-bold block mb-1">Starring Cast</span>
-                        <span class="text-white font-medium">{{ movie.cast }}</span>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <!-- Technical Drive Specs Card -->
-                <div class="bg-brand-surface/70 border border-brand-border rounded-xl p-4 space-y-2">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
-                        <i data-lucide="hard-drive" class="w-4 h-4 text-brand-blue"></i>
-                        <span>Google Drive Source Specs</span>
+                <!-- Cast & Director Section with TMDB Profile Images -->
+                {% if credits_data and (credits_data.directors or credits_data.cast) %}
+                <div class="space-y-3 pt-1">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                        <i data-lucide="users" class="w-4 h-4 text-amber-400"></i>
+                        <span>Director & Starring Cast</span>
                     </h3>
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs pt-1">
-                        <div>
-                            <span class="text-slate-500 block">File Name</span>
-                            <span class="text-slate-300 font-mono truncate block" title="{{ movie.file_name }}">{{ movie.file_name }}</span>
-                        </div>
-                        <div>
-                            <span class="text-slate-500 block">Size</span>
-                            <span class="text-slate-300 font-semibold">
-                                {% if movie.file_size %}
-                                {{ (movie.file_size / (1024 * 1024 * 1024))|round(2) }} GB
+
+                    <!-- Scrollable tray of Director & Cast Cards -->
+                    <div class="flex items-start gap-4 sm:gap-5 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-slate-700/60 scrollbar-track-transparent">
+                        
+                        <!-- Director Card(s) -->
+                        {% for dir in credits_data.directors %}
+                        <div class="flex flex-col items-center flex-none w-20 sm:w-24 text-center group">
+                            <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 border-amber-500/60 bg-gradient-to-br from-amber-500/20 via-slate-800 to-slate-900 shadow-lg shadow-amber-500/10 group-hover:border-amber-400 transition-all duration-300 transform group-hover:scale-105">
+                                {% if dir.profile_path %}
+                                <img src="{{ dir.profile_path }}" alt="{{ dir.name }}" class="w-full h-full object-cover" loading="lazy">
                                 {% else %}
-                                Unknown
+                                <div class="w-full h-full flex items-center justify-center text-amber-300 font-black text-lg sm:text-xl">
+                                    {{ dir.name[:2]|upper }}
+                                </div>
                                 {% endif %}
+                            </div>
+                            <span class="mt-1.5 inline-block text-[9px] uppercase font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 tracking-wider">
+                                Director
+                            </span>
+                            <span class="mt-1 text-xs font-bold text-white truncate w-full" title="{{ dir.name }}">
+                                {{ dir.name }}
                             </span>
                         </div>
-                        <div>
-                            <span class="text-slate-500 block">Video Codec</span>
-                            <span class="text-emerald-400 font-bold">{{ movie.codec }}</span>
-                        </div>
-                        <div>
-                            <span class="text-slate-500 block">Streaming Mode</span>
-                            <span class="text-brand-blue font-semibold">HTTP 206 Direct Lossless</span>
-                        </div>
-                    </div>
+                        {% endfor %}
 
-                    {% if user.role == 'superadmin' and not is_share_page %}
-                    <div class="mt-3 pt-3 border-t border-brand-border/60 flex items-center justify-between">
-                        <div class="flex items-center space-x-2">
-                            <span class="w-2 h-2 rounded-full bg-brand-blue animate-pulse"></span>
-                            <span class="text-xs text-slate-300 font-semibold">SuperAdmin Option:</span>
+                        {% if credits_data.directors and credits_data.cast %}
+                        <!-- Visual separator between Director and Cast -->
+                        <div class="h-16 sm:h-20 w-px bg-slate-800 self-center flex-none my-auto"></div>
+                        {% endif %}
+
+                        <!-- Cast Members -->
+                        {% for actor in credits_data.cast %}
+                        <div class="flex flex-col items-center flex-none w-20 sm:w-24 text-center group">
+                            <div class="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-slate-700/80 bg-gradient-to-br from-slate-800 to-slate-900 shadow-md group-hover:border-brand-red/70 transition-all duration-300 transform group-hover:scale-105">
+                                {% if actor.profile_path %}
+                                <img src="{{ actor.profile_path }}" alt="{{ actor.name }}" class="w-full h-full object-cover" loading="lazy">
+                                {% else %}
+                                <div class="w-full h-full flex items-center justify-center text-slate-300 font-black text-lg sm:text-xl">
+                                    {{ actor.name[:2]|upper }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <span class="mt-2 text-xs font-bold text-slate-200 group-hover:text-white truncate w-full" title="{{ actor.name }}">
+                                {{ actor.name }}
+                            </span>
+                            {% if actor.character %}
+                            <span class="text-[10px] text-slate-400 truncate w-full" title="{{ actor.character }}">
+                                {{ actor.character }}
+                            </span>
+                            {% endif %}
                         </div>
-                        <a href="https://drive.google.com/file/d/{{ movie.gdrive_file_id }}/view" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 text-xs text-brand-blue hover:text-sky-300 font-bold bg-brand-blue/10 hover:bg-brand-blue/20 border border-brand-blue/30 px-3 py-1.5 rounded-lg transition">
-                            <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-                            <span>Open raw file in Google Drive &nearr;</span>
-                        </a>
+                        {% endfor %}
+
                     </div>
-                    {% endif %}
+                </div>
+                {% endif %}
+
+                <!-- Collapsible Google Drive Source Specs & Video Info (Closed by Default) -->
+                <div class="bg-brand-surface/70 border border-brand-border rounded-xl overflow-hidden transition">
+                    <button type="button" onclick="toggleDriveSpecs()" class="w-full flex items-center justify-between p-3.5 sm:p-4 hover:bg-slate-800/40 transition group cursor-pointer text-left">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg bg-brand-blue/10 border border-brand-blue/30 flex items-center justify-center text-brand-blue flex-none group-hover:bg-brand-blue/20 transition">
+                                <i data-lucide="info" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <span class="text-xs font-bold uppercase tracking-wider text-slate-300 group-hover:text-white transition flex items-center space-x-2">
+                                    <span>Google Drive Source & Video Specs</span>
+                                    <span class="text-[10px] lowercase text-slate-500 font-mono">({{ movie.resolution or 'HD' }}, {{ movie.codec }})</span>
+                                </span>
+                                <span class="text-[11px] text-slate-500 block">Streaming mode, file size, codec & drive file details</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 text-slate-400 group-hover:text-white transition">
+                            <span id="specs-toggle-hint" class="text-[11px] font-semibold text-slate-500 group-hover:text-slate-400">Show</span>
+                            <i data-lucide="chevron-down" id="specs-chevron" class="w-4 h-4 transition-transform duration-300"></i>
+                        </div>
+                    </button>
+
+                    <div id="drive-specs-content" class="hidden border-t border-brand-border/80 p-4 bg-slate-900/60 space-y-3">
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                            <div>
+                                <span class="text-slate-500 block text-[11px]">File Name</span>
+                                <span class="text-slate-300 font-mono truncate block text-xs" title="{{ movie.file_name }}">{{ movie.file_name }}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[11px]">Size</span>
+                                <span class="text-slate-300 font-semibold text-xs">
+                                    {% if movie.file_size %}
+                                    {{ (movie.file_size / (1024 * 1024 * 1024))|round(2) }} GB
+                                    {% else %}
+                                    Unknown
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[11px]">Video Codec</span>
+                                <span class="text-emerald-400 font-bold text-xs">{{ movie.codec }}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[11px]">Streaming Mode</span>
+                                <span class="text-brand-blue font-semibold text-xs">HTTP 206 Direct Lossless</span>
+                            </div>
+                        </div>
+
+                        {% if user.role == 'superadmin' and not is_share_page %}
+                        <div class="mt-3 pt-3 border-t border-brand-border/60 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-2 h-2 rounded-full bg-brand-blue animate-pulse"></span>
+                                <span class="text-xs text-slate-300 font-semibold">SuperAdmin Option:</span>
+                            </div>
+                            <a href="https://drive.google.com/file/d/{{ movie.gdrive_file_id }}/view" target="_blank" rel="noopener noreferrer" class="inline-flex items-center space-x-1.5 text-xs text-brand-blue hover:text-sky-300 font-bold bg-brand-blue/10 hover:bg-brand-blue/20 border border-brand-blue/30 px-3 py-1.5 rounded-lg transition">
+                                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                                <span>Open raw file in Google Drive &nearr;</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
 
                 <!-- Trailer link if available -->
@@ -360,7 +414,7 @@
     </div>
 </div>
 
-<!-- SuperAdmin Share Modal -->
+{# SuperAdmin Share Modal #}
 {% if user.role == 'superadmin' and not is_share_page %}
 <div id="superadmin-share-modal" class="fow-modal-overlay fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden items-center justify-center p-4" style="position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; z-index: 99999 !important; background-color: rgba(0, 0, 0, 0.85) !important;">
     <div class="fow-modal-card bg-brand-surface border border-brand-border rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6 relative m-auto" style="background-color: #12151c !important; border-color: #232a36 !important;">
@@ -714,6 +768,26 @@
         }
     }
     {% endif %}
+
+    function toggleDriveSpecs() {
+        const content = document.getElementById('drive-specs-content');
+        const chevron = document.getElementById('specs-chevron');
+        const hint = document.getElementById('specs-toggle-hint');
+        if (!content) return;
+        const isHidden = content.classList.contains('hidden');
+        if (isHidden) {
+            content.classList.remove('hidden');
+            if (chevron) chevron.classList.add('rotate-180');
+            if (hint) hint.textContent = 'Hide';
+        } else {
+            content.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+            if (hint) hint.textContent = 'Show';
+        }
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    }
 
     // Universal Modal Backdrop Click & Escape Key Handlers
     document.addEventListener('click', function(e) {
