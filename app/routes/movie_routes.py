@@ -1,7 +1,8 @@
+from __future__ import annotations
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from typing import Optional
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timezone, timedelta
 import secrets
 from app.database import get_db, desc, Session, utc_now
