@@ -183,28 +183,11 @@
                         <span class="bg-slate-800 border border-slate-700 text-slate-300 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                             {{ movie.duration }} min
                         </span>
-                        <span class="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                            {{ movie.resolution }}
-                        </span>
 
                         {% if movie.original_language %}
-                        <span class="bg-amber-500/25 text-amber-300 border border-amber-500/60 text-xs font-black px-3 py-0.5 rounded-full flex items-center space-x-1.5 shadow-sm shadow-amber-500/10">
+                        <span class="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-semibold px-3 py-0.5 rounded-full flex items-center space-x-1.5 shadow-sm shadow-amber-500/10">
                             <i data-lucide="languages" class="w-3.5 h-3.5 text-amber-400"></i>
                             <span>Original: {{ movie.original_language }}</span>
-                        </span>
-                        {% endif %}
-
-                        {% if movie.codec == 'HEVC' %}
-                        <span class="bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-black px-2.5 py-0.5 rounded-full">
-                            HEVC / H.265 Direct Stream
-                        </span>
-                        {% elif movie.codec == 'AV1' %}
-                        <span class="bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-black px-2.5 py-0.5 rounded-full">
-                            AV1 Accelerated
-                        </span>
-                        {% else %}
-                        <span class="bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                            {{ movie.codec }}
                         </span>
                         {% endif %}
                     </div>
