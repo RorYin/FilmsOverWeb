@@ -9,6 +9,12 @@
     .cinema-backdrop {
         background: radial-gradient(circle at center, #181d28 0%, #08090b 85%);
     }
+    /* Ensure subtitle lines stay strictly centered via CSS part */
+    movi-player::part(subtitle) {
+        text-align: center !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
 </style>
 {% endblock %}
 
@@ -166,6 +172,226 @@
         const initialPosition = parseFloat("{{ initial_time }}") || 0;
         const totalDuration = parseFloat("{{ (episode.duration or 0) * 60 }}") || 0;
         const nextEpisodeUrl = "{{ ('/watch/episode/' ~ next_episode.id) if next_episode else '' }}";
+        const seriesOriginalLanguage = "{{ series.original_language or '' }}".trim();
+
+        // Ensure subtitles stay strictly centered when size changes
+        function ensureSubtitleCentering(player) {
+            if (!player) return;
+            const applyFix = () => {
+                const shadow = player.shadowRoot;
+                if (!shadow) return;
+                if (!shadow.getElementById('movi-subtitle-center-fix')) {
+                    const style = document.createElement('style');
+                    style.id = 'movi-subtitle-center-fix';
+                    style.textContent = `
+                        .movi-subtitle-overlay {
+                            left: 0 !important;
+                            right: 0 !important;
+                            width: 100% !important;
+                            text-align: center !important;
+                        }
+                        .movi-subtitle-anchor {
+                            padding-left: 0 !important;
+                            padding-right: 0 !important;
+                            width: 100% !important;
+                            text-align: center !important;
+                            display: flex !important;
+                            justify-content: center !important;
+                            align-items: center !important;
+                        }
+                        .movi-subtitle-block {
+                            text-align: center !important;
+                            margin-left: auto !important;
+                            margin-right: auto !important;
+                            display: inline-flex !important;
+                            flex-direction: column !important;
+                            align-items: center !important;
+                            max-width: 95% !important;
+                        }
+                        .movi-subtitle-line,
+                        .movi-subtitle-overlay.movi-subtitle-format-vtt .movi-subtitle-line {
+                            text-align: center !important;
+                            margin-left: auto !important;
+                            margin-right: auto !important;
+                            width: auto !important;
+                        }
+                    `;
+                    shadow.appendChild(style);
+                }
+            };
+
+            applyFix();
+            player.addEventListener('loadedmetadata', applyFix);
+            if (window.customElements) {
+                customElements.whenDefined('movi-player').then(applyFix).catch(() => {});
+            }
+        }
+        ensureSubtitleCentering(moviPlayer);
+
+        // Standard Language Mapping & Audio Selection
+        const LANG_MAP = {
+            'tel': ['tel', 'te', 'telugu'],
+            'te': ['tel', 'te', 'telugu'],
+            'telugu': ['tel', 'te', 'telugu'],
+
+            'tam': ['tam', 'ta', 'tamil'],
+            'ta': ['tam', 'ta', 'tamil'],
+            'tamil': ['tam', 'ta', 'tamil'],
+
+            'kan': ['kan', 'kn', 'kannada'],
+            'kn': ['kan', 'kn', 'kannada'],
+            'kannada': ['kan', 'kn', 'kannada'],
+
+            'hin': ['hin', 'hi', 'hindi'],
+            'hi': ['hin', 'hi', 'hindi'],
+            'hindi': ['hin', 'hi', 'hindi'],
+
+            'eng': ['eng', 'en', 'english'],
+            'en': ['eng', 'en', 'english'],
+            'english': ['eng', 'en', 'english'],
+
+            'mal': ['mal', 'ml', 'malayalam'],
+            'ml': ['mal', 'ml', 'malayalam'],
+            'malayalam': ['mal', 'ml', 'malayalam'],
+
+            'ben': ['ben', 'bn', 'bengali', 'bangla'],
+            'bn': ['ben', 'bn', 'bengali', 'bangla'],
+            'bengali': ['ben', 'bn', 'bengali', 'bangla'],
+
+            'mar': ['mar', 'mr', 'marathi'],
+            'mr': ['mar', 'mr', 'marathi'],
+            'marathi': ['mar', 'mr', 'marathi'],
+
+            'pan': ['pan', 'pa', 'punjabi'],
+            'pa': ['pan', 'pa', 'punjabi'],
+            'punjabi': ['pan', 'pa', 'punjabi'],
+
+            'guj': ['guj', 'gu', 'gujarati'],
+            'gu': ['guj', 'gu', 'gujarati'],
+            'gujarati': ['guj', 'gu', 'gujarati'],
+
+            'fra': ['fra', 'fre', 'fr', 'french'],
+            'fre': ['fra', 'fre', 'fr', 'french'],
+            'fr': ['fra', 'fre', 'fr', 'french'],
+            'french': ['fra', 'fre', 'fr', 'french'],
+
+            'spa': ['spa', 'es', 'spanish'],
+            'es': ['spa', 'es', 'spanish'],
+            'spanish': ['spa', 'es', 'spanish'],
+
+            'jpn': ['jpn', 'ja', 'japanese'],
+            'ja': ['jpn', 'ja', 'japanese'],
+            'japanese': ['jpn', 'ja', 'japanese'],
+
+            'kor': ['kor', 'ko', 'korean'],
+            'ko': ['kor', 'ko', 'korean'],
+            'korean': ['kor', 'ko', 'korean'],
+
+            'deu': ['deu', 'ger', 'de', 'german'],
+            'ger': ['deu', 'ger', 'de', 'german'],
+            'de': ['deu', 'ger', 'de', 'german'],
+            'german': ['deu', 'ger', 'de', 'german'],
+
+            'zho': ['zho', 'chi', 'zh', 'chinese', 'mandarin'],
+            'chi': ['zho', 'chi', 'zh', 'chinese', 'mandarin'],
+            'zh': ['zho', 'chi', 'zh', 'chinese', 'mandarin'],
+            'chinese': ['zho', 'chi', 'zh', 'chinese', 'mandarin'],
+            'mandarin': ['zho', 'chi', 'zh', 'chinese', 'mandarin'],
+
+            'rus': ['rus', 'ru', 'russian'],
+            'ru': ['rus', 'ru', 'russian'],
+            'russian': ['rus', 'ru', 'russian'],
+
+            'ita': ['ita', 'it', 'italian'],
+            'it': ['ita', 'it', 'italian'],
+            'italian': ['ita', 'it', 'italian'],
+
+            'por': ['por', 'pt', 'portuguese'],
+            'pt': ['por', 'pt', 'portuguese'],
+            'portuguese': ['por', 'pt', 'portuguese']
+        };
+
+        function getLanguageVariants(langNameOrCode) {
+            if (!langNameOrCode) return [];
+            const clean = String(langNameOrCode).trim().toLowerCase();
+            if (LANG_MAP[clean]) {
+                return LANG_MAP[clean];
+            }
+            const variants = new Set([clean]);
+            if (clean.length >= 3) variants.add(clean.substring(0, 3));
+            if (clean.length >= 2) variants.add(clean.substring(0, 2));
+            return Array.from(variants);
+        }
+
+        function trackMatchesLanguage(track, variants) {
+            if (!track || !variants || variants.length === 0) return false;
+            const trackLang = (track.language || track.lang || '').trim().toLowerCase();
+            const trackLabel = (track.label || track.title || '').trim().toLowerCase();
+
+            for (const v of variants) {
+                if (!v) continue;
+                if (trackLang && (trackLang === v || trackLang.startsWith(v) || v.startsWith(trackLang))) {
+                    return true;
+                }
+                if (trackLabel) {
+                    const wordRegex = new RegExp('\\b' + v + '\\b', 'i');
+                    if (wordRegex.test(trackLabel)) return true;
+                    if (v.length >= 3 && trackLabel.includes(v)) return true;
+                }
+            }
+            return false;
+        }
+
+        let audioAutoSelected = false;
+
+        function autoSelectOriginalAudio() {
+            if (audioAutoSelected) return;
+            if (!moviPlayer) return;
+
+            let tracks = [];
+            if (moviPlayer.player && typeof moviPlayer.player.getAudioTracks === 'function') {
+                tracks = moviPlayer.player.getAudioTracks() || [];
+            }
+            if ((!tracks || tracks.length === 0) && moviPlayer.audioTracks && moviPlayer.audioTracks.length > 0) {
+                tracks = Array.from(moviPlayer.audioTracks).map((t, idx) => ({
+                    id: t.trackId !== null && t.trackId !== undefined ? t.trackId : idx,
+                    language: t.lang || '',
+                    label: t.label || '',
+                    rawTrack: t
+                }));
+            }
+
+            if (!tracks || tracks.length === 0) {
+                return; // Tracks not parsed yet, wait for next event
+            }
+
+            audioAutoSelected = true;
+
+            const variants = getLanguageVariants(seriesOriginalLanguage);
+            let matchedTrack = null;
+
+            if (variants.length > 0) {
+                matchedTrack = tracks.find(t => trackMatchesLanguage(t, variants));
+            }
+
+            // Fallback to first audio from the source if original language is not available
+            const targetTrack = matchedTrack || tracks[0];
+
+            if (targetTrack) {
+                console.log(`[Audio Auto-Select] Series original language: "${seriesOriginalLanguage}". Selecting track:`, targetTrack);
+                if (typeof moviPlayer.pickAudioTrack === 'function' && targetTrack.id !== undefined) {
+                    moviPlayer.pickAudioTrack(targetTrack.id);
+                } else if (moviPlayer.player && typeof moviPlayer.player.selectAudioTrack === 'function' && targetTrack.id !== undefined) {
+                    moviPlayer.player.selectAudioTrack(targetTrack.id);
+                } else if (targetTrack.rawTrack) {
+                    targetTrack.rawTrack.enabled = true;
+                }
+            }
+        }
+
+        moviPlayer.addEventListener('trackschange', autoSelectOriginalAudio);
+        moviPlayer.addEventListener('loadedmetadata', autoSelectOriginalAudio);
+        moviPlayer.addEventListener('playing', autoSelectOriginalAudio);
 
         const playerContainer = document.getElementById('player-container');
         const moviPlayer = document.getElementById('movi-player');
