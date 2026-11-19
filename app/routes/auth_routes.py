@@ -31,8 +31,11 @@ async def tv_login_submit(
     db: Session = Depends(get_db)
 ):
     """Validates 5-digit TV code, consumes it, and issues a 24-hour session."""
+    is_api = request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", "")
     clean_code = re.sub(r"\D", "", code.strip())
     if len(clean_code) != 5:
+        if is_api:
+            return JSONResponse({"status": "error", "error": "Please enter a valid 5-digit numeric TV code."}, status_code=400)
         return templates.TemplateResponse(
             request=request,
             name="tv_login.html",
@@ -49,6 +52,8 @@ async def tv_login_submit(
     ).first()
 
     if not tv_code:
+        if is_api:
+            return JSONResponse({"status": "error", "error": "Invalid or expired TV code. Please request a new 5-digit code from your SuperAdmin."}, status_code=400)
         return templates.TemplateResponse(
             request=request,
             name="tv_login.html",
@@ -76,6 +81,26 @@ async def tv_login_submit(
         {"sub": user.email, "role": user.role, "name": user.name},
         expires_delta=timedelta(hours=24)
     )
+
+    if is_api:
+        resp = JSONResponse({
+            "status": "success",
+            "token": token,
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": 86400,
+            "user": {"email": user.email, "role": user.role, "name": user.name}
+        })
+        resp.set_cookie(
+            key=COOKIE_NAME,
+            value=token,
+            httponly=True,
+            max_age=60 * 60 * 24,
+            samesite="lax",
+            secure=False
+        )
+        return resp
+
     response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     response.set_cookie(
         key=COOKIE_NAME,
@@ -110,8 +135,11 @@ async def login_action(
     next: str = Form("/"),
     db: Session = Depends(get_db)
 ):
+    is_api = request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", "")
     user = db.query(User).filter(User.email == email.strip().lower()).first()
     if not user or not verify_password(password, user.hashed_password):
+        if is_api:
+            return JSONResponse({"status": "error", "error": "Invalid email address or password."}, status_code=400)
         return templates.TemplateResponse(
             request=request,
             name="login.html",
@@ -120,6 +148,8 @@ async def login_action(
         )
     
     if not user.is_active:
+        if is_api:
+            return JSONResponse({"status": "error", "error": "Your account has been deactivated."}, status_code=403)
         return templates.TemplateResponse(
             request=request,
             name="login.html",
@@ -130,6 +160,25 @@ async def login_action(
     # Generate JWT
     token = create_access_token({"sub": user.email, "role": user.role, "name": user.name})
     
+    if is_api:
+        resp = JSONResponse({
+            "status": "success",
+            "token": token,
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": 60 * 60 * 24 * 7,
+            "user": {"email": user.email, "role": user.role, "name": user.name}
+        })
+        resp.set_cookie(
+            key=COOKIE_NAME,
+            value=token,
+            httponly=True,
+            max_age=60 * 60 * 24 * 7,
+            samesite="lax",
+            secure=False
+        )
+        return resp
+
     # If the user is flagged to change password, route straight to /change-password
     if user.must_change_password:
         target_url = "/change-password"

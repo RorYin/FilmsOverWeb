@@ -176,6 +176,20 @@ async def watch_episode_player(
     from app.gdrive import get_gdrive_access_token
     gdrive_access_token = get_gdrive_access_token(db)
 
+    if request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", ""):
+        from fastapi.responses import JSONResponse
+        return JSONResponse({
+            "status": "success",
+            "episode_id": episode.id,
+            "gdrive_file_id": episode.gdrive_file_id,
+            "file_name": episode.file_name,
+            "cloudflare_worker_url": cloudflare_worker_url,
+            "google_api_key": google_api_key,
+            "gdrive_access_token": gdrive_access_token or "",
+            "initial_time": initial_time,
+            "duration": (episode.duration or 0) * 60
+        })
+
     return templates.TemplateResponse(
         request=request,
         name="watch_episode.html",

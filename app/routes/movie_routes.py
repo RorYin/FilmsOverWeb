@@ -233,6 +233,59 @@ async def home_library(
         setattr(m, "default_playable_id", q_vers[-1]["id"] if q_vers else m.id)
     hero_movie = hero_movies[0] if hero_movies else None
 
+    if request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({
+            "status": "success",
+            "hero_movies": [
+                {
+                    "id": m.id,
+                    "title": m.title,
+                    "year": m.year,
+                    "rating": m.rating,
+                    "resolution": m.resolution,
+                    "codec": m.codec,
+                    "overview": m.overview,
+                    "backdrop": m.backdrop_path or m.poster_path,
+                    "poster": m.poster_path,
+                    "default_playable_id": getattr(m, "default_playable_id", m.id)
+                } for m in hero_movies
+            ],
+            "continue_watching": [
+                {
+                    "id": cw["episode"].id if cw["is_episode"] else cw["movie"].id,
+                    "is_episode": cw["is_episode"],
+                    "title": cw["title"],
+                    "subtitle": cw["subtitle"],
+                    "watch_url": cw["watch_url"],
+                    "poster": cw["poster_path"],
+                    "progress_percent": cw["progress_percent"]
+                } for cw in continue_watching
+            ],
+            "recently_added": [
+                {
+                    "id": m.id,
+                    "title": m.title,
+                    "year": m.year,
+                    "poster": m.poster_path,
+                    "resolution": m.resolution,
+                    "codec": m.codec
+                } for m in recently_added
+            ],
+            "recent_series": [
+                {
+                    "id": s.id,
+                    "title": s.title,
+                    "year": s.year,
+                    "poster": s.poster_path
+                } for s in recent_series
+            ],
+            "user": {
+                "name": user.name,
+                "role": user.role,
+                "email": user.email
+            }
+        })
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -292,6 +345,22 @@ async def browse_movies(
                 g_clean = g.strip()
                 if g_clean:
                     genres_set.add(g_clean)
+
+    if request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({
+            "status": "success",
+            "movies": [
+                {
+                    "id": m.id,
+                    "title": m.title,
+                    "year": m.year,
+                    "poster": m.poster_path,
+                    "resolution": m.resolution,
+                    "codec": m.codec,
+                    "rating": m.rating
+                } for m in movies
+            ]
+        })
 
     return templates.TemplateResponse(
         request=request,
@@ -420,6 +489,24 @@ async def movie_detail(
     og_data = get_movie_og_data(movie, request)
     credits_data = await get_movie_credits_context(movie, db)
 
+    if request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({
+            "status": "success",
+            "id": movie.id,
+            "title": movie.title,
+            "year": movie.year,
+            "rating": movie.rating,
+            "duration": movie.duration,
+            "genres": movie.genres,
+            "overview": movie.overview,
+            "director": movie.director,
+            "cast": movie.cast,
+            "poster": movie.poster_path,
+            "backdrop": movie.backdrop_path or movie.poster_path,
+            "default_playable_target": default_playable_target,
+            "quality_versions": quality_versions
+        })
+
     return templates.TemplateResponse(
         request=request,
         name="movie_detail.html",
@@ -528,6 +615,20 @@ async def watch_player(
 
     is_shared = getattr(user, "is_shared", False)
     share_token = getattr(user, "share_token", "") or getattr(user, "shared_gdrive_file_id", "") or movie.gdrive_file_id
+
+    if request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", ""):
+        return JSONResponse({
+            "status": "success",
+            "movie_id": movie.id,
+            "gdrive_file_id": movie.gdrive_file_id,
+            "file_name": movie.file_name,
+            "cloudflare_worker_url": cloudflare_worker_url,
+            "google_api_key": google_api_key,
+            "gdrive_access_token": gdrive_access_token or "",
+            "initial_time": initial_time,
+            "duration": (movie.duration or 0) * 60,
+            "quality_versions": quality_versions
+        })
 
     resp = templates.TemplateResponse(
         request=request,
