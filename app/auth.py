@@ -116,9 +116,9 @@ def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = get_current_user_optional(request, db)
     if not user:
-        # Check if requesting JSON or HTML
-        accept = request.headers.get("accept", "")
-        if "text/html" in accept:
+        # Check if requesting JSON or HTML (webOS / API clients receive 401 instead of HTML redirect)
+        is_api = request.headers.get("x-client") == "webos" or "application/json" in request.headers.get("accept", "")
+        if not is_api and "text/html" in request.headers.get("accept", ""):
             raise HTTPException(
                 status_code=status.HTTP_307_TEMPORARY_REDIRECT,
                 headers={"Location": f"/login?next={request.url.path}"}
