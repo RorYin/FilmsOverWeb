@@ -155,4 +155,6 @@ app.include_router(superadmin_routes.router)
 # Custom exception handler for 401s on web requests
 @app.exception_handler(401)
 async def unauthorized_handler(request: Request, exc):
+    if request.headers.get("x-client") == "webos" or ("application/json" in request.headers.get("accept", "") and "text/html" not in request.headers.get("accept", "")):
+        return JSONResponse({"status": "error", "detail": "Unauthorized"}, status_code=401)
     return RedirectResponse(url=f"/login?next={request.url.path}")
