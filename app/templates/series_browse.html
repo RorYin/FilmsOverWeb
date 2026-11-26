@@ -3,13 +3,13 @@
 {% block title %}Explore TV Shows & Web Series - FilmsOverWeb{% endblock %}
 
 {% block content %}
-<div class="w-[90%] mx-auto px-2 sm:px-4 py-8">
+<div class="w-full sm:w-[90%] mx-auto px-3 sm:px-4 py-6 sm:py-8">
 
     <!-- Header & Search -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-brand-border">
         <div>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-white flex items-center space-x-2">
-                <i data-lucide="tv" class="w-7 h-7 text-brand-red"></i>
+                <i data-lucide="tv" class="w-6 h-6 sm:w-7 sm:h-7 text-brand-red shrink-0"></i>
                 <span>TV Shows & Web Series</span>
             </h1>
             <p class="text-xs sm:text-sm text-slate-400 mt-1">
@@ -18,15 +18,15 @@
         </div>
 
         <!-- Filter & Search Controls -->
-        <form method="GET" action="/series" class="flex flex-wrap items-center gap-3">
+        <form method="GET" action="/series" class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto">
             <!-- Search Query -->
-            <div class="relative">
-                <input type="text" name="q" placeholder="Filter series, cast..." value="{{ search_query or '' }}" class="bg-brand-surface border border-brand-border text-sm text-slate-200 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:border-brand-red w-48 sm:w-60">
+            <div class="relative w-full sm:w-60">
+                <input type="text" name="q" placeholder="Filter series, cast..." value="{{ search_query or '' }}" class="bg-brand-surface border border-brand-border text-sm text-slate-200 rounded-lg pl-8 pr-3 py-2 focus:outline-none focus:border-brand-red w-full">
                 <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-2.5 top-3"></i>
             </div>
 
             <!-- Sort By -->
-            <select name="sort" onchange="this.form.submit()" class="bg-brand-surface border border-brand-border text-xs sm:text-sm text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-brand-red cursor-pointer">
+            <select name="sort" onchange="this.form.submit()" class="bg-brand-surface border border-brand-border text-xs sm:text-sm text-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:border-brand-red cursor-pointer w-full sm:w-auto">
                 <option value="newest" {% if active_sort == 'newest' %}selected{% endif %}>Recently Added</option>
                 <option value="rating" {% if active_sort == 'rating' %}selected{% endif %}>Highest Rated</option>
                 <option value="year" {% if active_sort == 'year' %}selected{% endif %}>Release Year</option>
@@ -43,12 +43,12 @@
     {% if genres %}
     <div class="py-4">
         <div class="flex items-center space-x-2 overflow-x-auto pb-2 text-xs">
-            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[11px] mr-1">Genres:</span>
-            <a href="/series?{% if search_query %}q={{ search_query }}&{% endif %}sort={{ active_sort }}" class="px-3 py-1 rounded-full border transition {% if not active_genre %}bg-brand-red text-black border-brand-red font-extrabold{% else %}bg-brand-surface text-slate-400 border-brand-border hover:border-slate-500{% endif %}">
+            <span class="text-slate-400 font-semibold uppercase tracking-wider text-[11px] mr-1 shrink-0">Genres:</span>
+            <a href="/series?{% if search_query %}q={{ search_query }}&{% endif %}sort={{ active_sort }}" class="px-3 py-1 rounded-full border whitespace-nowrap shrink-0 transition {% if not active_genre %}bg-brand-red text-black border-brand-red font-extrabold{% else %}bg-brand-surface text-slate-400 border-brand-border hover:border-slate-500{% endif %}">
                 All
             </a>
             {% for g in genres %}
-            <a href="/series?genre={{ g }}&{% if search_query %}q={{ search_query }}&{% endif %}sort={{ active_sort }}" class="px-3 py-1 rounded-full border whitespace-nowrap transition {% if active_genre == g %}bg-brand-blue text-white border-brand-blue font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
+            <a href="/series?genre={{ g }}&{% if search_query %}q={{ search_query }}&{% endif %}sort={{ active_sort }}" class="px-3 py-1 rounded-full border whitespace-nowrap shrink-0 transition {% if active_genre == g %}bg-brand-blue text-white border-brand-blue font-bold{% else %}bg-brand-surface text-slate-300 border-brand-border hover:border-slate-500{% endif %}">
                 {{ g }}
             </a>
             {% endfor %}
@@ -58,7 +58,7 @@
 
     <!-- Series Grid -->
     {% if series_list %}
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6 pt-4">
+    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-5 pt-4">
         {% for series in series_list %}
             {% include "components/series_card.html" %}
         {% endfor %}

@@ -34,18 +34,18 @@
 
     <!-- Newly Created Credentials Banner -->
     {% if new_credentials %}
-    <div class="bg-gradient-to-r from-emerald-950/40 via-brand-surface to-slate-900 border border-emerald-500/40 rounded-2xl p-6 shadow-2xl space-y-4">
-        <div class="flex items-center justify-between">
+    <div class="bg-gradient-to-r from-emerald-950/40 via-brand-surface to-slate-900 border border-emerald-500/40 rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
                     <i data-lucide="check-circle" class="w-6 h-6"></i>
                 </div>
-                <div>
+                <div class="min-w-0">
                     <h3 class="text-base font-bold text-white">Guest Account Created Successfully!</h3>
-                    <p class="text-xs text-slate-300">Credentials have been generated for <strong>{{ new_credentials.email }}</strong></p>
+                    <p class="text-xs text-slate-300 break-words">Credentials have been generated for <strong>{{ new_credentials.email }}</strong></p>
                 </div>
             </div>
-            <button onclick="copyCredentials()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center space-x-1.5 transition">
+            <button onclick="copyCredentials()" class="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center space-x-1.5 transition shrink-0">
                 <i data-lucide="copy" class="w-4 h-4"></i>
                 <span id="copy-text">Copy Credentials</span>
             </button>
@@ -116,12 +116,12 @@
                 </div>
             </div>
 
-            <div class="md:col-span-12 flex items-center justify-between pt-2">
+            <div class="md:col-span-12 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                 <span class="text-[11px] text-slate-500 flex items-center space-x-1">
-                    <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400"></i>
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
                     <span>Passwords are auto-generated with 12-char cryptographic randomness</span>
                 </span>
-                <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm flex items-center space-x-2 shadow-lg shadow-emerald-600/20 transition">
+                <button type="submit" class="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl text-sm flex items-center space-x-2 shadow-lg shadow-emerald-600/20 transition shrink-0">
                     <i data-lucide="send" class="w-4 h-4"></i>
                     <span>Generate & Send Invite</span>
                 </button>

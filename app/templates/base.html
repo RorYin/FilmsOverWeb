@@ -28,15 +28,15 @@
 
     <!-- Top Navigation Bar -->
     <nav class="sticky top-0 z-50 bg-[#0b0c0e]/90 backdrop-blur-md border-b border-brand-border/60 transition-all duration-300">
-        <div class="w-[90%] mx-auto px-2 sm:px-4">
-            <div class="flex items-center justify-between h-16">
+        <div class="w-full sm:w-[90%] mx-auto px-3 sm:px-4">
+            <div class="flex items-center justify-between h-14 sm:h-16 gap-2">
                 <!-- Brand / Logo -->
-                <div class="flex items-center space-x-8">
-                    <a href="{% if user and user.is_shared %}/share/{{ user.share_token or user.shared_gdrive_file_id }}{% else %}/{% endif %}" class="flex items-center space-x-2 text-2xl font-black tracking-wider group">
-                        <span class="p-1.5 bg-brand-red rounded-lg group-hover:scale-105 transition-transform duration-200">
-                            <i data-lucide="clapperboard" class="w-6 h-6 text-black"></i>
+                <div class="flex items-center space-x-3 md:space-x-8 min-w-0">
+                    <a href="{% if user and user.is_shared %}/share/{{ user.share_token or user.shared_gdrive_file_id }}{% else %}/{% endif %}" class="flex items-center space-x-2 text-lg sm:text-2xl font-black tracking-wide sm:tracking-wider group min-w-0">
+                        <span class="p-1.5 bg-brand-red rounded-lg group-hover:scale-105 transition-transform duration-200 shrink-0">
+                            <i data-lucide="clapperboard" class="w-5 h-5 sm:w-6 sm:h-6 text-black"></i>
                         </span>
-                        <span class="text-white">FILMS<span class="text-brand-red">OVER</span>WEB</span>
+                        <span class="text-white truncate">FILMS<span class="text-brand-red">OVER</span>WEB</span>
                     </a>
                     
                     <!-- Main Navigation Links: Movies & TV Shows -->
@@ -53,7 +53,7 @@
                 </div>
 
                 <!-- Right Actions -->
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 sm:space-x-4 shrink-0">
                     {% if user and not user.is_shared %}
                     <!-- Search Bar Form -->
                     <form action="/movies" method="GET" class="relative hidden sm:block">
@@ -64,15 +64,15 @@
 
                     {% if user %}
                     {% if user.is_shared %}
-                    <div class="flex items-center space-x-2 bg-amber-500/15 border border-amber-500/40 px-3.5 py-1.5 rounded-full text-xs font-bold text-amber-300 shadow-sm">
-                        <i data-lucide="ticket" class="w-4 h-4 text-amber-400"></i>
+                    <div class="flex items-center space-x-1.5 sm:space-x-2 bg-amber-500/15 border border-amber-500/40 px-2.5 sm:px-3.5 py-1.5 rounded-full text-[11px] sm:text-xs font-bold text-amber-300 shadow-sm">
+                        <i data-lucide="ticket" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0"></i>
                         <span>48h Guest Pass</span>
                     </div>
                     {% else %}
                     <!-- User Profile Pill & Comprehensive Management Dropdown -->
                     <div class="relative" id="user-menu-container">
-                        <button type="button" id="user-menu-button" aria-expanded="false" aria-haspopup="true" class="flex items-center space-x-2 bg-brand-surface border border-brand-border px-3 py-1.5 rounded-full hover:border-slate-500 focus:outline-none transition cursor-pointer select-none">
-                            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center font-black text-xs text-black uppercase shadow-sm pointer-events-none">
+                        <button type="button" id="user-menu-button" aria-expanded="false" aria-haspopup="true" class="flex items-center space-x-1.5 sm:space-x-2 bg-brand-surface border border-brand-border px-2 sm:px-3 py-1 sm:py-1.5 rounded-full hover:border-slate-500 focus:outline-none transition cursor-pointer select-none">
+                            <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center font-black text-xs text-black uppercase shadow-sm pointer-events-none shrink-0">
                                 {{ user.name[:1] if user.name else user.email[:1] }}
                             </div>
                             <span class="text-xs font-semibold hidden md:inline text-slate-200 pointer-events-none">{{ user.name or user.email.split('@')[0] }}</span>
@@ -85,7 +85,7 @@
                         </button>
                         
                         <!-- Dropdown Menu with Home, Library, TV Shows and Admin Options -->
-                        <div id="user-menu-dropdown" class="absolute right-0 mt-2 w-56 bg-brand-surface border border-brand-border rounded-2xl shadow-2xl py-2 hidden transition-all z-50 backdrop-blur-xl">
+                        <div id="user-menu-dropdown" class="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-brand-surface border border-brand-border rounded-2xl shadow-2xl py-2 hidden transition-all z-50 backdrop-blur-xl">
                             <div class="px-4 py-2 border-b border-brand-border text-xs text-slate-400">
                                 Signed in as<br>
                                 <span class="font-medium text-slate-200 truncate block">{{ user.email }}</span>
@@ -153,26 +153,42 @@
                     </div>
                     {% endif %}
                     {% else %}
-                    <a href="/login" class="bg-brand-red hover:bg-brand-redHover text-black px-5 py-2 rounded-xl font-bold text-sm shadow-md transition">Sign In</a>
+                    <a href="/login" class="bg-brand-red hover:bg-brand-redHover text-black px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-xl font-bold text-xs sm:text-sm shadow-md transition">Sign In</a>
                     {% endif %}
                 </div>
             </div>
+
+            {% if user and not user.is_shared %}
+            <!-- Compact Mobile Navigation & Search Bar -->
+            <div class="md:hidden pb-2.5 pt-1 flex items-center gap-2 border-t border-brand-border/40">
+                <a href="/movies" class="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition {% if request.url.path.startswith('/movies') %}text-brand-red bg-brand-surface{% else %}text-slate-300 bg-brand-surface/50{% endif %}">
+                    Movies
+                </a>
+                <a href="/series" class="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition {% if request.url.path.startswith('/series') %}text-brand-red bg-brand-surface{% else %}text-slate-300 bg-brand-surface/50{% endif %}">
+                    TV Shows
+                </a>
+                <form action="/movies" method="GET" class="relative flex-1 min-w-0 sm:hidden">
+                    <input type="text" name="q" placeholder="Search..." value="{{ q or '' }}" class="w-full bg-brand-surface border border-brand-border text-xs text-slate-200 rounded-full pl-8 pr-3 py-1.5 focus:outline-none focus:border-brand-red">
+                    <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
+                </form>
+            </div>
+            {% endif %}
         </div>
     </nav>
 
     <!-- Main Content Body -->
-    <main class="flex-grow">
+    <main class="flex-grow min-w-0 w-full">
         {% block content %}{% endblock %}
     </main>
 
     <!-- Footer -->
-    <footer class="bg-[#08090b] border-t border-brand-border py-8 mt-16 text-slate-500 text-xs">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div class="flex items-center space-x-2">
+    <footer class="bg-[#08090b] border-t border-brand-border py-6 sm:py-8 mt-12 sm:mt-16 text-slate-500 text-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+            <div class="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
                 <span class="font-black text-slate-400">FILMS<span class="text-brand-red">OVER</span>WEB</span>
                 <span>&bull; Direct Google Drive Streamer with Lossless Playback</span>
             </div>
-            <div class="flex items-center space-x-3 text-slate-400">
+            <div class="flex flex-wrap items-center justify-center gap-2 text-slate-400">
                 <span class="px-2 py-0.5 rounded bg-brand-surface border border-brand-border text-[11px]">HEVC (H.265)</span>
                 <span class="px-2 py-0.5 rounded bg-brand-surface border border-brand-border text-[11px]">AV1</span>
                 <span class="px-2 py-0.5 rounded bg-brand-surface border border-brand-border text-[11px]">4K UHD</span>

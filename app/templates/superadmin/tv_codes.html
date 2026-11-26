@@ -3,23 +3,23 @@
 {% block title %}TV Access Codes - SuperAdmin Control Panel{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+<div class="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
 
     <!-- Header Section -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-brand-border">
-        <div>
+        <div class="min-w-0">
             <div class="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">
                 <i data-lucide="shield-check" class="w-4 h-4"></i>
                 <span>SuperAdmin Restricted Area</span>
             </div>
-            <h1 class="text-3xl font-extrabold text-white">5-Digit TV Access Codes</h1>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white">5-Digit TV Access Codes</h1>
             <p class="text-xs sm:text-sm text-slate-400 mt-1">
                 Generate and manage single-use 5-digit TV access codes. When redeemed on Smart TVs via <code class="text-amber-400 bg-slate-900 px-1 py-0.5 rounded">/tv-login</code>, the session automatically expires after 24 hours.
             </p>
         </div>
 
         <!-- Quick Stats Pill -->
-        <div class="flex items-center space-x-2">
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
             <div class="bg-brand-surface border border-brand-border px-3.5 py-1.5 rounded-xl text-xs flex items-center space-x-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
                 <span class="text-slate-400">Active Unused:</span>
@@ -46,8 +46,8 @@
             </div>
         </div>
 
-        <div class="flex items-center space-x-3">
-            <div class="bg-black/80 border-2 border-amber-400 text-amber-300 px-6 py-3 rounded-2xl font-mono text-3xl font-black tracking-widest shadow-inner select-all" id="generated-code-box">
+        <div class="flex flex-wrap items-center justify-center gap-3">
+            <div class="bg-black/80 border-2 border-amber-400 text-amber-300 px-5 sm:px-6 py-2.5 sm:py-3 rounded-2xl font-mono text-2xl sm:text-3xl font-black tracking-widest shadow-inner select-all" id="generated-code-box">
                 {{ created_code }}
             </div>
             <button type="button" onclick="navigator.clipboard.writeText('{{ created_code }}'); this.innerText='Copied!';" class="bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-4 py-3 rounded-xl text-xs transition shadow-md cursor-pointer flex items-center space-x-1.5">
@@ -66,10 +66,10 @@
     {% endif %}
 
     <!-- Generate Code Action Card -->
-    <div class="bg-brand-surface border border-brand-border rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div class="bg-brand-surface border border-brand-border rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-lg font-bold text-white flex items-center space-x-2">
-                <i data-lucide="key" class="w-5 h-5 text-amber-400"></i>
+                <i data-lucide="key" class="w-5 h-5 text-amber-400 shrink-0"></i>
                 <span>Generate New TV Access Code</span>
             </h2>
             <p class="text-xs text-slate-400 mt-1">
@@ -77,8 +77,8 @@
             </p>
         </div>
 
-        <form method="POST" action="/superadmin/tv-codes/generate">
-            <button type="submit" class="bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-6 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-lg shadow-amber-500/20 transition transform hover:scale-[1.02] cursor-pointer">
+        <form method="POST" action="/superadmin/tv-codes/generate" class="w-full sm:w-auto">
+            <button type="submit" class="w-full sm:w-auto justify-center bg-amber-500 hover:bg-amber-400 text-black font-extrabold px-6 py-3 rounded-xl text-sm flex items-center space-x-2 shadow-lg shadow-amber-500/20 transition transform hover:scale-[1.02] cursor-pointer">
                 <i data-lucide="plus-circle" class="w-4 h-4"></i>
                 <span>Generate 5-Digit Code</span>
             </button>

@@ -6,18 +6,18 @@
 <div class="relative pb-20">
 
     <!-- Hero Backdrop Banner -->
-    <div class="relative w-full h-[50vh] min-h-[380px] max-h-[550px] overflow-hidden">
+    <div class="relative w-full h-[38vh] sm:h-[50vh] min-h-[260px] sm:min-h-[380px] max-h-[550px] overflow-hidden">
         <img src="{{ series.backdrop_path or series.poster_path }}" alt="{{ series.title }}" class="w-full h-full object-cover object-center filter brightness-75">
         <div class="hero-overlay-top"></div>
         <div class="hero-overlay-bottom"></div>
     </div>
 
     <!-- Main Content Container overlapping backdrop -->
-    <div class="w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 -mt-44 relative z-10">
-        <div class="flex flex-col md:flex-row gap-8 items-start">
+    <div class="w-full sm:w-[90%] max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 -mt-28 sm:-mt-44 relative z-10">
+        <div class="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
             
             <!-- Poster Column -->
-            <div class="w-56 sm:w-64 flex-none mx-auto md:mx-0">
+            <div class="w-44 sm:w-64 flex-none mx-auto md:mx-0">
                 <div class="movie-poster-box rounded-2xl overflow-hidden border-2 border-brand-border shadow-2xl bg-brand-surface relative">
                     <img src="{{ series.poster_path }}" alt="{{ series.title }}" class="w-full h-full object-cover">
                     
@@ -52,7 +52,7 @@
             </div>
 
             <!-- Details Column -->
-            <div class="flex-1 space-y-6">
+            <div class="flex-1 w-full min-w-0 space-y-6">
                 <!-- Title & Badges -->
                 <div>
                     <div class="flex flex-wrap items-center gap-2 mb-2">
@@ -77,8 +77,8 @@
                     </div>
 
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                        <div class="min-w-0">
+                            <h1 class="text-2xl sm:text-5xl font-black text-white tracking-tight leading-tight break-words">
                                 {{ series.title }}
                             </h1>
                         </div>
@@ -166,7 +166,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {% for ep in episodes %}
                 {% set prog = episode_progress.get(ep.id) %}
-                <div class="bg-brand-surface/70 hover:bg-brand-surface border border-brand-border hover:border-slate-600 rounded-2xl overflow-hidden transition-all duration-200 group flex flex-col justify-between shadow-md hover:shadow-xl">
+                <div class="bg-brand-surface/70 hover:bg-brand-surface border border-brand-border hover:border-slate-600 rounded-2xl overflow-hidden transition-all duration-200 group flex flex-col justify-between shadow-md hover:shadow-xl min-w-0">
                     
                     <div>
                         <!-- Episode Still / Thumbnail with Play Hover -->

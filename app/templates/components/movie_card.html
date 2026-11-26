@@ -1,12 +1,12 @@
-<a href="/movie/{{ movie.id }}" class="group cursor-pointer block w-full movie-tile" data-nav="tile" tabindex="0">
+<a href="/movie/{{ movie.id }}" class="group cursor-pointer block w-full movie-tile min-w-0" data-nav="tile" tabindex="0">
     <!-- Neat Rounded Corner Poster Tile (Universal 2:3 aspect-ratio) -->
-    <div class="movie-poster-box relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
+    <div class="movie-poster-box relative aspect-[2/3] w-full rounded-xl sm:rounded-2xl overflow-hidden bg-slate-900 border border-brand-border/60 group-hover:border-slate-500 shadow-md group-hover:shadow-2xl group-hover:scale-105 transition-all duration-300">
         <img src="{{ movie.poster_path }}" alt="{{ movie.title }}" loading="lazy" class="w-full h-full object-cover">
     </div>
 
     <!-- Movie Name Below with Release Year -->
-    <div class="pt-2.5 px-1">
-        <h3 class="text-xs sm:text-sm font-medium text-slate-200 group-hover:text-white truncate transition-colors" title="{{ movie.title }}{% if movie.year %} ({{ movie.year }}){% endif %}">
+    <div class="pt-1.5 sm:pt-2.5 px-0.5 sm:px-1">
+        <h3 class="text-[11px] sm:text-sm font-medium text-slate-200 group-hover:text-white truncate transition-colors" title="{{ movie.title }}{% if movie.year %} ({{ movie.year }}){% endif %}">
             {{ movie.title }}{% if movie.year %} ({{ movie.year }}){% endif %}
         </h3>
     </div>
